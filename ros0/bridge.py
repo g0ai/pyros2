@@ -2,13 +2,15 @@ import threading
 import zmq
 import time
 
+from pynput.keyboard import Key, Listener
+
 import ros0
 from ros0.rate import Rate
 
 class Bridge:
-    def __init__(self, protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.SERVER):
+    def __init__(self, hz=10, protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.SERVER):
         self.is_alive = False
-        self.rate = Rate(hz=10)
+        self.rate = Rate(hz=hz)
         self.protocol = protocol
         self.mode = mode
         self.config = config
@@ -17,6 +19,8 @@ class Bridge:
         self.port = 8768
 
         self.thread = None
+        self.trigger = Listener(on_press=self._trigger)
+        self.trigger.start()
 
         self.recv_data = []
         self.send_data = [b"hello"]
@@ -78,6 +82,10 @@ class Bridge:
         dat = self.recv_data
         self.recv_data = []
         return dat
+    
+    def _trigger(self, key):
+        if key.char == 's':
+            self.stop()
 
     def _loop(self):
         while self.is_alive:
@@ -104,6 +112,9 @@ if __name__=="__main__":
     import sys
 
     counter = 0
+
+    # trigger = Listener(on_press=on_press)
+    # trigger.start()
 
     if sys.argv[1] == "1":
         b = Bridge(protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.SERVER)
