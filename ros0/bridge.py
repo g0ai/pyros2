@@ -1,6 +1,7 @@
 import threading
 import zmq
 import time
+import pickle
 
 from pynput.keyboard import Key, Listener
 
@@ -20,16 +21,17 @@ class Bridge:
 
         self.thread = None
         self.trigger = Listener(on_press=self._trigger)
-        self.trigger.start()
+        # self.trigger.start()
 
         self.recv_data = []
-        self.send_data = [b"hello"]
+        self.send_data = [pickle.dumps("hello")]
 
         if self.protocol == ros0.ZMQ:
             self.ctx = zmq.Context()
             if self.mode & ros0.SUB:
                 self.sub_sock = self.ctx.socket(zmq.SUB)
-                # self.sub_sock.subscribe("ros0")
+                self.sub_topic = "ros0"
+                self.sub_sock.subscribe(self.sub_topic)
                 self.sub_sock.setsockopt(zmq.SUBSCRIBE, b"")
                 if self.config & ros0.SERVER:
                     self.sub_sock.connect(f"tcp://{self.ip}:{self.port}")
@@ -77,22 +79,32 @@ class Bridge:
             return self.is_alive
         else:
             return False
-        
-    def get(self, last=False):
+    
+
+    def send(self, dat):
+        dat = [self.pub_topic.encode(), pickle.dumps(dat)]
+        self.send_data.extend(dat)
+        return True
+
+    def recv(self, last=False):
         dat = self.recv_data
         self.recv_data = []
-        return dat
+        return [pickle.loads(d) for d in dat]
     
     def _trigger(self, key):
-        if key.char == 's':
-            self.stop()
+        try:
+            if key.char == 's':
+                self.stop()
+        except:
+            pass
 
     def _loop(self):
         while self.is_alive:
             self.rate.limit_rate()
             if self.mode & ros0.SUB:
                 try:
-                    dat = self.sub_sock.recv(zmq.NOBLOCK)
+                    topic = self.sub_sock.recv_string(zmq.NOBLOCK)
+                    dat = self.sub_sock.recv()
                     if dat is not None:
                         self.recv_data.append(dat)
                 except:
@@ -117,25 +129,26 @@ if __name__=="__main__":
     # trigger.start()
 
     if sys.argv[1] == "1":
-        b = Bridge(protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.SERVER)
+        b = Bridge(hz=1000, protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.SERVER)
         b.start()
 
         while b.alive(wait=100):
             # print(b.get(last=True), end="\r")
-            b.send_data.append(f"{counter}".encode())
-            print(b.get())
+            b.send(counter)
+            print(b.recv())
             counter += 1
 
-        print("bridge.py | closing ...")
+        print("bridge.py | server closing ...")
 
     elif sys.argv[1] == "2":
-        b = Bridge(protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.CLIENT)
+        b = Bridge(hz=1000, protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.CLIENT)
         b.start()
 
-        while b.alive(wait=100):
-            b.send_data.append(f"{counter}".encode())
+        while b.alive(wait=1):
+            # b.send_data.append(f"{counter}".encode())
+            b.send(counter)
             # print("Ping pong.")
-            print(b.get())
+            # print(b.get())
             counter += 1
 
-        print("bridge.py | closing ...")
+        print("bridge.py | client closing ...")
