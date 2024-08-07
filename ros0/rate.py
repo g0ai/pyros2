@@ -4,6 +4,7 @@ import time
 class Rate:
     def __init__(self, hz=1):
         self.next_time = None
+        self.last_time = None
         self.rate_hz = hz
         self.rate_s = 1.0 / self.rate_hz
 
@@ -15,9 +16,12 @@ class Rate:
             if time_diff > 0 and cond:
                 time.sleep(time_diff)
                 self.next_time += self.rate_s
+                self.last_time = time.perf_counter()
                 return cond
             else:
+                self.last_time = time.perf_counter()
                 return cond
         else:
             self.next_time = time.perf_counter() + self.rate_s
+            self.last_time = time.perf_counter()
             return cond

@@ -9,12 +9,13 @@ import ros0
 from ros0.rate import Rate
 
 class Bridge:
-    def __init__(self, hz=10, protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.SERVER):
+    def __init__(self, hz=10, states={}, protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.SERVER):
         self.is_alive = False
         self.rate = Rate(hz=hz)
         self.protocol = protocol
         self.mode = mode
         self.config = config
+        self.states = states
 
         self.ip = "localhost" # "127.0.0.1"
         self.port = 8768
@@ -80,6 +81,24 @@ class Bridge:
         else:
             return False
     
+    def get(self, name=None, default=None):
+        new_data = self.recv()
+        if len(new_data) > 0:
+            self.states.update(new_data[-1])
+        if name is None:
+            return self.states
+        elif name in self.states:
+            return self.states[name]
+        return default
+
+    def set(self, name={}, val=None):
+        if isinstance(name, dict):
+            self.states.update(name) 
+            self.send(self.states)
+        elif name in self.states:
+            self.states[name] = val
+            self.send(self.states)
+        return None
 
     def send(self, dat):
         dat = [self.pub_topic.encode(), pickle.dumps(dat)]
@@ -90,6 +109,9 @@ class Bridge:
         dat = self.recv_data
         self.recv_data = []
         return [pickle.loads(d) for d in dat]
+    
+    def info(self):
+        return self.is_alive
     
     def _trigger(self, key):
         try:
@@ -103,10 +125,15 @@ class Bridge:
             self.rate.limit_rate()
             if self.mode & ros0.SUB:
                 try:
-                    topic = self.sub_sock.recv_string(zmq.NOBLOCK)
-                    dat = self.sub_sock.recv()
-                    if dat is not None:
-                        self.recv_data.append(dat)
+                    while True:
+                        topic = self.sub_sock.recv_string(zmq.NOBLOCK)
+                        dat = self.sub_sock.recv()
+                        if dat is not None:
+                            self.recv_data.append(dat)
+                            # dat_dict = pickle.loads(dat)
+                            # print("> ", dat, self.states)
+                            # if isinstance(dat, dict):
+                            #     self.states.update(dat)
                 except:
                     pass
             if self.mode & ros0.PUB:
