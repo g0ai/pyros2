@@ -8,6 +8,7 @@ from pynput.keyboard import Key, Listener
 
 import pyros2
 from pyros2.rate import Rate
+from pyros2.topics import Topic, topic_parse, topic_packer
 
 MASTER_IP = "localhost"
 MASTER_PORT = 8768
@@ -28,21 +29,22 @@ class Node:
         self.trigger = Listener(on_press=self._trigger)
         # self.trigger.start()
 
-        self.recv_data = []
-        self.send_data = [pickle.dumps("hello")]
+        self.recv_data = {}
+        self.send_data = [] # [pickle.dumps("hello")]
 
         self.ctx = zmq.Context()
 
         self.sub_sock = self.ctx.socket(zmq.SUB)
-        self.sub_topics = ["ros0", "info"] + subscribe
+        self.sub_topics = ["ros0", "main"] + subscribe
 
         for topics in self.sub_topics:
             self.sub_sock.subscribe(topics)
             self.sub_sock.setsockopt(zmq.SUBSCRIBE, topics.encode())
+            self.recv_data[topics] = []
         
 
         self.pub_sock = self.ctx.socket(zmq.PUB) # SO_REUSEADDR
-        self.pub_topics = ["info"] + publish
+        self.pub_topics = ["main"] + publish
 
         while True:
             try:
@@ -117,15 +119,15 @@ class Node:
             self.send(self.states)
         return None
 
-    def send(self, dat, topic="info"):
-        dat = [topic.encode(), pickle.dumps(dat)]
+    def send(self, dat, topic="main"):
+        dat = [topic.encode(), self._topic_packer(topic)(dat)]
         self.send_data.extend(dat)
         return True
 
-    def recv(self, last=False):
-        dat = self.recv_data
-        self.recv_data = []
-        return [pickle.loads(d) for d in dat]
+    def recv(self, topic="main", last=False):
+        dats = self.recv_data[topic]
+        self.recv_data[topic] = []
+        return [self._topic_parser(topic)(dat[1]) for dat in dats]
     
     def info(self):
         return self.is_alive
@@ -136,6 +138,13 @@ class Node:
                 self.stop()
         except:
             pass
+    
+    def _topic_parser(self, topic):
+        return topic_parse(Topic.PYOBJ)
+    
+
+    def _topic_packer(self, topic):
+        return topic_packer(Topic.PYOBJ)
 
     def _loop(self):
         while self.is_alive:
@@ -144,13 +153,14 @@ class Node:
                 while True:
                     topic = self.sub_sock.recv_string(zmq.NOBLOCK)
                     dat = self.sub_sock.recv()
+                    recv_time_ns = time.perf_counter_ns()
                     if dat is not None:
                         if topic == "ros0":
                             msg = json.loads(dat.decode())
                             if "new_node" in msg:
-                                self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg["new_node"])}")
+                                self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg['new_node'])}")
                         elif topic in self.sub_topics:
-                            self.recv_data.append(dat)
+                            self.recv_data[topic].append((recv_time_ns, dat))
                         # dat_dict = pickle.loads(dat)
                         # print("> ", dat, self.states)
                         # if isinstance(dat, dict):
@@ -176,16 +186,16 @@ if __name__=="__main__":
     # trigger.start()
 
     if sys.argv[1] == "1":
-        b = Node(hz=1000)
+        b = Node(hz=1000, subscribe=["numbers", "letters"])
         b.start()
 
         while b.alive(wait=100):
             # print(b.get(last=True), end="\r")
             # b.send(counter)
-            print(b.recv())
+            print(b.recv("numbers"))
             counter += 1
 
-        print("bridge.py | server closing ...")
+        print("node.py | server closing ...")
 
     elif sys.argv[1] == "2":
         b = Node(hz=1000)
@@ -193,22 +203,22 @@ if __name__=="__main__":
 
         while b.alive(wait=100):
             # b.send_data.append(f"{counter}".encode())
-            b.send(1000+counter)
+            b.send(1000+counter, "numbers")
             print(b.recv()) # print("Ping pong.")
             # print(b.get())
             counter += 1
 
-        print("bridge.py | client closing ...")
+        print("node.py | client closing ...")
     
     elif sys.argv[1] == "3":
-        b = Node(hz=1000)
+        b = Node(hz=1000, subscribe=["numbers"])
         b.start()
 
         while b.alive(wait=100):
             # b.send_data.append(f"{counter}".encode())
-            b.send(5000+counter)
+            b.send(5000+counter, "letters")
             print(b.recv()) # print("Ping pong.")
             # print(b.get())
             counter += 1
 
-        print("bridge.py | client closing ...")
+        print("node.py | client closing ...")
