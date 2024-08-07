@@ -5,11 +5,11 @@ import pickle
 
 from pynput.keyboard import Key, Listener
 
-import ros0
-from ros0.rate import Rate
+import pyros2
+from pyros2.rate import Rate
 
 class Bridge:
-    def __init__(self, hz=10, states={}, protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.SERVER):
+    def __init__(self, hz=10, states={}, protocol=pyros2.ZMQ, mode=pyros2.PUBSUB, config=pyros2.SERVER):
         self.is_alive = False
         self.rate = Rate(hz=hz)
         self.protocol = protocol
@@ -27,33 +27,33 @@ class Bridge:
         self.recv_data = []
         self.send_data = [pickle.dumps("hello")]
 
-        if self.protocol == ros0.ZMQ:
+        if self.protocol == pyros2.ZMQ:
             self.ctx = zmq.Context()
-            if self.mode & ros0.SUB:
+            if self.mode & pyros2.SUB:
                 self.sub_sock = self.ctx.socket(zmq.SUB)
                 self.sub_topic = "ros0"
                 self.sub_sock.subscribe(self.sub_topic)
                 self.sub_sock.setsockopt(zmq.SUBSCRIBE, b"")
-                if self.config & ros0.SERVER:
+                if self.config & pyros2.SERVER:
                     self.sub_sock.connect(f"tcp://{self.ip}:{self.port}")
-                elif self.config & ros0.CLIENT:
+                elif self.config & pyros2.CLIENT:
                     self.sub_sock.bind(f"tcp://*:{self.port+1}")
 
 
-            if self.mode & ros0.PUB:
+            if self.mode & pyros2.PUB:
                 self.pub_sock = self.ctx.socket(zmq.PUB)
                 self.pub_topic = "ros0"
-                if self.config & ros0.SERVER:
+                if self.config & pyros2.SERVER:
                     self.pub_sock.connect(f"tcp://{self.ip}:{self.port+1}")
-                elif self.config & ros0.CLIENT:
+                elif self.config & pyros2.CLIENT:
                     self.pub_sock.bind(f"tcp://*:{self.port}")
 
 
     def __del__(self):
-        if self.protocol == ros0.ZMQ:
-            if self.mode & ros0.SUB:
+        if self.protocol == pyros2.ZMQ:
+            if self.mode & pyros2.SUB:
                 self.sub_sock.close()
-            if self.mode & ros0.PUB:
+            if self.mode & pyros2.PUB:
                 self.pub_sock.close()
             self.ctx.term()
 
@@ -123,7 +123,7 @@ class Bridge:
     def _loop(self):
         while self.is_alive:
             self.rate.limit_rate()
-            if self.mode & ros0.SUB:
+            if self.mode & pyros2.SUB:
                 try:
                     while True:
                         topic = self.sub_sock.recv_string(zmq.NOBLOCK)
@@ -136,7 +136,7 @@ class Bridge:
                             #     self.states.update(dat)
                 except:
                     pass
-            if self.mode & ros0.PUB:
+            if self.mode & pyros2.PUB:
                 # self.pub_sock.send(b"testing")
                 if len(self.send_data) > 0:
                     self.pub_sock.send_multipart(self.send_data)
@@ -156,7 +156,7 @@ if __name__=="__main__":
     # trigger.start()
 
     if sys.argv[1] == "1":
-        b = Bridge(hz=1000, protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.SERVER)
+        b = Bridge(hz=1000, protocol=pyros2.ZMQ, mode=pyros2.PUBSUB, config=pyros2.SERVER)
         b.start()
 
         while b.alive(wait=100):
@@ -168,7 +168,7 @@ if __name__=="__main__":
         print("bridge.py | server closing ...")
 
     elif sys.argv[1] == "2":
-        b = Bridge(hz=1000, protocol=ros0.ZMQ, mode=ros0.PUBSUB, config=ros0.CLIENT)
+        b = Bridge(hz=1000, protocol=pyros2.ZMQ, mode=pyros2.PUBSUB, config=pyros2.CLIENT)
         b.start()
 
         while b.alive(wait=1):

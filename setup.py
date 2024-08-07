@@ -6,7 +6,7 @@ with open("requirements.txt") as f:
 long_description = "Minimalistic ros-compatible python bridge."
 
 setup(
-    name="ros0",
+    name="pyros2",
     version="1.0.0",
     author="Ibrahim Abdulhafiz",
     author_email="ibrahim@g0ai.com",
