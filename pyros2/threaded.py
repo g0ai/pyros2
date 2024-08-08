@@ -27,7 +27,8 @@ class X(Threaded):
 class Threaded:
     def __init__(self, hz=10):
         self.is_alive = False
-        self._rate = Rate(hz=hz)
+        # self._rate = Rate(hz=hz)
+        self._rate = 1/hz
 
         self._thread = None
         self.trigger = Listener(on_press=self._trigger)
@@ -94,8 +95,11 @@ class Threaded:
 
     def _loop(self):
         while self.is_alive:
-            self._rate.limit_rate()
+            # self._rate.limit_rate()
+            t1 = time.time()
             self.iter()
+            if (time.time() - t1) < self._rate:
+                time.sleep(self._rate - (time.time() - t1))
 
         print(f"thread {self.__class__.__name__} succesfully stopped.")
 

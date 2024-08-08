@@ -14,9 +14,10 @@ MASTER_IP = "localhost"
 MASTER_PORT = 8768
 
 class Node:
-    def __init__(self, hz=10, publish=[], subscribe=[]):
+    def __init__(self, hz=1000, publish=[], subscribe=[], start=True):
         self.is_alive = False
-        self.rate = Rate(hz=hz)
+        # self.rate = Rate(hz=hz)
+        self._rate = 1/hz
         # self.protocol = protocol
         # self.mode = mode
         # self.config = config
@@ -62,9 +63,12 @@ class Node:
             self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(i)}")
         
 
-        time.sleep(0.1)
+        time.sleep(0.5) # switch later to ack to make sure everything is ok
         msg = {"new_node":self.position}
         self.pub_sock.send_multipart([b"ros0", json.dumps(msg).encode()])
+
+        if start:
+            self.start()
 
     def _node_port(self, pos=None):
         if pos is None:
@@ -82,7 +86,7 @@ class Node:
             self.thread = threading.Thread(target=self._loop)
             self.thread.start()
         else:
-            print("thread already running")
+            print(f"Node already running ...")
 
     def stop(self, force=False):
         if self.is_alive:
@@ -90,7 +94,7 @@ class Node:
             if force:
                 pass
         else:
-            print("thread already stopped")
+            print("Node already stopped")
 
     def alive(self, wait=0):
         if self.is_alive:
@@ -100,34 +104,41 @@ class Node:
         else:
             return False
     
-    def get(self, name=None, default=None):
-        new_data = self.recv()
+    # def get(self, name=None, default=None):
+    #     new_data = self.recv()
+    #     if len(new_data) > 0:
+    #         self.states.update(new_data[-1])
+    #     if name is None:
+    #         return self.states
+    #     elif name in self.states:
+    #         return self.states[name]
+    #     return default
+
+    def get(self, topic="main", default=None):
+        new_data = self.recv(topic)
         if len(new_data) > 0:
-            self.states.update(new_data[-1])
-        if name is None:
-            return self.states
-        elif name in self.states:
-            return self.states[name]
+            return new_data[-1]
         return default
 
-    def set(self, name={}, val=None):
-        if isinstance(name, dict):
-            self.states.update(name) 
-            self.send(self.states)
-        elif name in self.states:
-            self.states[name] = val
-            self.send(self.states)
-        return None
+    # def set(self, name={}, val=None):
+    #     if isinstance(name, dict):
+    #         self.states.update(name) 
+    #         self.send(self.states)
+    #     elif name in self.states:
+    #         self.states[name] = val
+    #         self.send(self.states)
+    #     return None
 
     def send(self, dat, topic="main"):
-        dat = [topic.encode(), self._topic_packer(topic)(dat)]
-        self.send_data.extend(dat)
+        dat = (topic.encode(), self._topic_packer(topic)(dat))
+        self.send_data.append(dat)
         return True
 
     def recv(self, topic="main", last=False):
-        dats = self.recv_data[topic]
-        self.recv_data[topic] = []
+        dats = self.recv_data[topic].copy()
+        self.recv_data[topic].clear()
         return [self._topic_parser(topic)(dat[1]) for dat in dats]
+        # return [self._topic_parser(topic)(dats[-1][1])] if len(dats) > 0 else []
     
     def info(self):
         return self.is_alive
@@ -140,15 +151,15 @@ class Node:
             pass
     
     def _topic_parser(self, topic):
-        return topic_parse(Topic.PYOBJ)
+        return topic_parse(topic, Topic.PYOBJ)
     
 
     def _topic_packer(self, topic):
-        return topic_packer(Topic.PYOBJ)
+        return topic_packer(topic, Topic.PYOBJ)
 
     def _loop(self):
         while self.is_alive:
-            self.rate.limit_rate()
+            t1 = time.time()
             try:
                 while True:
                     topic = self.sub_sock.recv_string(zmq.NOBLOCK)
@@ -159,6 +170,7 @@ class Node:
                             msg = json.loads(dat.decode())
                             if "new_node" in msg:
                                 self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg['new_node'])}")
+                                print(f"New node found at {msg['new_node']}!")
                         elif topic in self.sub_topics:
                             self.recv_data[topic].append((recv_time_ns, dat))
                         # dat_dict = pickle.loads(dat)
@@ -168,12 +180,16 @@ class Node:
             except:
                 pass
             # self.pub_sock.send(b"testing")
-            if len(self.send_data) > 0:
-                self.pub_sock.send_multipart(self.send_data)
-                self.send_data = []
+            for topic, data in self.send_data:
+                self.pub_sock.send_multipart([topic, data])
+            self.send_data = []
+
+            if (time.time() - t1) < self._rate:
+                time.sleep(max(self._rate - (time.time() - t1), 0))
                     
 
-        print("thread stopped")
+        print("Node stopped")
+        self.__del__()
 
 
 
@@ -186,24 +202,25 @@ if __name__=="__main__":
     # trigger.start()
 
     if sys.argv[1] == "1":
-        b = Node(hz=1000, subscribe=["numbers", "letters"])
-        b.start()
+        b = Node(hz=1000, subscribe=["carstate-pyo", "letters-str"])
 
         while b.alive(wait=100):
             # print(b.get(last=True), end="\r")
             # b.send(counter)
-            print(b.recv("numbers"))
+            dat = b.get("carstate-pyo")
+            if dat is not None:
+                print(dat.aEgo)
+            # print(b.get("letters-str"))
             counter += 1
 
         print("node.py | server closing ...")
 
     elif sys.argv[1] == "2":
         b = Node(hz=1000)
-        b.start()
 
         while b.alive(wait=100):
             # b.send_data.append(f"{counter}".encode())
-            b.send(1000+counter, "numbers")
+            b.send(1000+counter, "numbers-str")
             print(b.recv()) # print("Ping pong.")
             # print(b.get())
             counter += 1
@@ -211,12 +228,11 @@ if __name__=="__main__":
         print("node.py | client closing ...")
     
     elif sys.argv[1] == "3":
-        b = Node(hz=1000, subscribe=["numbers"])
-        b.start()
+        b = Node(hz=1000, subscribe=["numbers-str"])
 
         while b.alive(wait=100):
             # b.send_data.append(f"{counter}".encode())
-            b.send(5000+counter, "letters")
+            b.send(f"{5000+counter}", "letters-str")
             print(b.recv()) # print("Ping pong.")
             # print(b.get())
             counter += 1
