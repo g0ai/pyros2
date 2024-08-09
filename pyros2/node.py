@@ -14,8 +14,10 @@ MASTER_IP = "localhost"
 MASTER_PORT = 8768
 
 class Node:
-    def __init__(self, hz=1000, publish=[], subscribe=[], start=True):
+    def __init__(self, hz=1000, autoupdate=True, publish=[], subscribe=[], start=True):
+        self.autoupdate = autoupdate
         self.is_alive = False
+        self.saving = False
         # self.rate = Rate(hz=hz)
         self._rate = 1/hz
         # self.protocol = protocol
@@ -68,7 +70,7 @@ class Node:
 
         time.sleep(0.5) # switch later to ack to make sure everything is ok
         msg = {"new_node":self.position}
-        self.pub_sock.send_multipart([b"ros0", json.dumps(msg).encode()])
+        self.pub_sock.send_multipart([b"ros0", self._make_info(), json.dumps(msg).encode()])
 
         if start:
             self.start()
@@ -96,6 +98,8 @@ class Node:
         self.ctx.term()
 
     def __getitem__(self, topic):
+        if self.autoupdate and len(self.recv_data[topic]) > 0:
+            self._update(topic)
         return self.last_data[topic]
     
 
@@ -177,7 +181,7 @@ class Node:
     #     return None
 
     def send(self, dat, topic="main"):
-        dat = (topic.encode(), self._topic_packer(topic)(dat))
+        dat = (topic.encode(), self._make_info(), self._topic_packer(topic)(dat))
         self.send_data.append(dat)
         return True
 
@@ -187,6 +191,11 @@ class Node:
         return [self._topic_parser(topic)(dat[1]) for dat in dats]
         # return [self._topic_parser(topic)(dats[-1][1])] if len(dats) > 0 else []
     
+    def _make_info(self):
+        info = {}
+        info["time"] = time.time()
+        return json.dumps(info).encode()
+
     def info(self):
         return self.is_alive
     
@@ -198,23 +207,28 @@ class Node:
             pass
     
     def _topic_parser(self, topic):
-        return topic_parse(topic, Topic.PYOBJ)
+        return topic_parse(topic, default=Topic.PYOBJ)
     
 
     def _topic_packer(self, topic):
-        return topic_packer(topic, Topic.PYOBJ)
+        return topic_packer(topic, default=Topic.PYOBJ)
 
     def _loop(self):
         while self.is_alive:
             t1 = time.time()
             try:
                 while True:
-                    topic = self.sub_sock.recv_string(zmq.NOBLOCK)
-                    dat = self.sub_sock.recv()
+                    # topic = self.sub_sock.recv_string(zmq.NOBLOCK)
+                    # info = self.sub_sock.recv_json(zmq.NOBLOCK)
+                    # dat = self.sub_sock.recv()
+                    topic, info, dat = self.sub_sock.recv_multipart(zmq.NOBLOCK)
+                    topic = topic.decode()
+                    info = json.loads(info)
+                    # print("> ", topic, info, dat)
                     recv_time_ns = time.perf_counter_ns()
                     if dat is not None:
                         if topic == "ros0":
-                            msg = json.loads(dat.decode())
+                            msg = json.loads(dat)
                             if "new_node" in msg:
                                 self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg['new_node'])}")
                                 print(f"New node found at {msg['new_node']}!")
@@ -227,8 +241,9 @@ class Node:
             except:
                 pass
             # self.pub_sock.send(b"testing")
-            for topic, data in self.send_data:
-                self.pub_sock.send_multipart([topic, data])
+            for topic, info, data in self.send_data:
+                self.pub_sock.send_multipart([topic, info, data])
+                # print("sent ", json.loads(info.decode()))
             self.send_data = []
 
             if (time.time() - t1) < self._rate:
@@ -252,13 +267,15 @@ if __name__=="__main__":
         node = Node()
         node["carstate-jsn"] = {"test":10}
         node["numbers-str"] = "hello world"
+        node["lidar-pyo"] = None
 
         while node.alive(wait=100):
-            node.update()
+            # node.update()
             # print(b.get(last=True), end="\r")
             # node.send(counter)
-            print(node["carstate-jsn"])
+            # print(node["carstate-jsn"])
             print(node["numbers-str"])
+            # print(node["lidar-pyo"])
             # print(b.get("letters-str"))
             counter += 1
 
@@ -270,7 +287,7 @@ if __name__=="__main__":
         while b.alive(wait=100):
             # b.send_data.append(f"{counter}".encode())
             b.send(f"{1000+counter}", "numbers-str")
-            print(b.recv()) # print("Ping pong.")
+            # print(b.recv()) # print("Ping pong.")
             # print(b.get())
             counter += 1
 
