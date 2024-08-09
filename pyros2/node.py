@@ -8,7 +8,7 @@ from pynput.keyboard import Key, Listener
 
 import pyros2
 from pyros2.rate import Rate
-from pyros2.topics import Topic, topic_parse, topic_packer
+from pyros2.topics import Topic, topic_parse, topic_packer, topic_code
 
 MASTER_IP = "localhost"
 MASTER_PORT = 8768
@@ -33,6 +33,8 @@ class Node:
         self.recv_data = {}
         self.send_data = [] # [pickle.dumps("hello")]
 
+        self.last_data = {}
+
         self.ctx = zmq.Context()
 
         self.sub_sock = self.ctx.socket(zmq.SUB)
@@ -42,6 +44,7 @@ class Node:
             self.sub_sock.subscribe(topics)
             self.sub_sock.setsockopt(zmq.SUBSCRIBE, topics.encode())
             self.recv_data[topics] = []
+            self.last_data[topics] = {} if topic_code(topics) == "jsn" else None
         
 
         self.pub_sock = self.ctx.socket(zmq.PUB) # SO_REUSEADDR
@@ -74,11 +77,36 @@ class Node:
         if pos is None:
             pos = self.position
         return MASTER_PORT + 2*pos
+    
+    def sub(self, topic):
+        if topic not in self.sub_topics:
+            self.sub_topics.append(topic)
+            self.recv_data[topic] = []
+            self.last_data[topic] = {} if topic_code(topic) == "jsn" else None
+        self.sub_sock.subscribe(topic)
+        self.sub_sock.setsockopt(zmq.SUBSCRIBE, topic.encode())
+    
+    def unsub(self, topic):
+        self.sub_sock.unsubscribe(topic)
+        self.sub_sock.setsockopt(zmq.UNSUBSCRIBE, topic.encode())
 
     def __del__(self):
         self.sub_sock.close()
         self.pub_sock.close()
         self.ctx.term()
+
+    def __getitem__(self, topic):
+        return self.last_data[topic]
+    
+
+    def __setitem__(self, topic, data):
+        if topic not in self.sub_topics:
+            self.sub(topic)
+        if topic_code(topic) == "jsn":
+            self.last_data[topic].update(data)
+        else:
+            self.last_data[topic] = data
+
 
     def start(self):
         if not self.is_alive:
@@ -114,11 +142,30 @@ class Node:
     #         return self.states[name]
     #     return default
 
-    def get(self, topic="main", default=None):
+    def get(self, topic="main", default=None, try_last=True):
         new_data = self.recv(topic)
         if len(new_data) > 0:
+            self.last_data[topic] = new_data[-1]
             return new_data[-1]
-        return default
+        # return default
+        return self.last_data[topic] if try_last and self.last_data[topic] is not None else default
+
+    def _update(self, topic):
+        ## only works for json currently
+        new_data = self.recv(topic)
+        for data in new_data:
+            if topic_code(topic) == "jsn":
+                self.last_data[topic].update(data)
+            else:
+                self.last_data[topic] = data
+    
+    def update(self, topic=None):
+        if topic is None:
+            for t in self.sub_topics:
+                self._update(t)
+        else:
+            self._update(topic)
+        
 
     # def set(self, name={}, val=None):
     #     if isinstance(name, dict):
@@ -202,25 +249,27 @@ if __name__=="__main__":
     # trigger.start()
 
     if sys.argv[1] == "1":
-        b = Node(hz=1000, subscribe=["carstate-pyo", "letters-str"])
+        node = Node()
+        node["carstate-jsn"] = {"test":10}
+        node["numbers-str"] = "hello world"
 
-        while b.alive(wait=100):
+        while node.alive(wait=100):
+            node.update()
             # print(b.get(last=True), end="\r")
-            # b.send(counter)
-            dat = b.get("carstate-pyo")
-            if dat is not None:
-                print(dat.aEgo)
+            # node.send(counter)
+            print(node["carstate-jsn"])
+            print(node["numbers-str"])
             # print(b.get("letters-str"))
             counter += 1
 
         print("node.py | server closing ...")
 
     elif sys.argv[1] == "2":
-        b = Node(hz=1000)
+        b = Node()
 
         while b.alive(wait=100):
             # b.send_data.append(f"{counter}".encode())
-            b.send(1000+counter, "numbers-str")
+            b.send(f"{1000+counter}", "numbers-str")
             print(b.recv()) # print("Ping pong.")
             # print(b.get())
             counter += 1

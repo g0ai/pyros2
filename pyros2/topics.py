@@ -13,6 +13,11 @@ class Topic:
 def null(x):
     return x
 
+def topic_code(topic):
+    ts = topic.split(TOPIC_SPLIT)
+    topic_code = ts[-1] if len(ts) > 1 and len(ts[-1]) == 3 else "jsn" # None
+    return topic_code
+
 
 def topic_packer(topic, default):
     ts = topic.split(TOPIC_SPLIT)
@@ -23,7 +28,7 @@ def topic_packer(topic, default):
     elif default == Topic.STRING or topic_code == "str":
         return lambda x : x.encode()
     elif default == Topic.JSON or topic_code == "jsn":
-        return json.dumps
+        return lambda x : json.dumps(x).encode()
     else:
         return null
 
@@ -42,6 +47,6 @@ def topic_parse(topic, default=Topic.PYOBJ):
     elif default == Topic.STRING or topic_code == "str":
         return lambda x : x.decode()
     elif default == Topic.JSON or topic_code == "jsn":
-        return json.loads
+        return lambda x : json.loads(x.decode())
     else:
         return null
