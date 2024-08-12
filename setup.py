@@ -1,4 +1,7 @@
 from setuptools import setup, find_packages
+from pathlib import Path
+
+Path(Path.home() / "pyros2").mkdir(parents=True, exist_ok=True)
 
 with open("requirements.txt") as f:
     requirements = f.readlines()

@@ -25,23 +25,42 @@ class X(Threaded):
 """
 
 class Threaded:
-    def __init__(self, hz=10):
-        self.is_alive = False
-        # self._rate = Rate(hz=hz)
-        self._rate = 1/hz
-
-        self._thread = None
-        self.trigger = Listener(on_press=self._trigger)
-        # self.trigger.start()
 
     def init(self):
         pass
+
+
+    def iter(self):
+        pass
+
 
     def close(self):
         pass
 
 
+    def get(self):
+        pass
+
+    def set(self):
+        pass
+
+
+    ##########################################################
+
+
+    def __init__(self, hz=1000, threaded=True):
+        self.is_alive = False
+        # self._rate = Rate(hz=hz)
+        self._rate = 1/hz
+        self.threaded = threaded
+        self.iter_time = None
+
+        self._thread = None
+        self.trigger = Listener(on_press=self._trigger)
+        # self.trigger.start()
+
     def __del__(self):
+        self.stop()
         self.close()
         pass
 
@@ -49,17 +68,22 @@ class Threaded:
     def start(self):
         if not self.is_alive:
             self.is_alive = True
-            self._thread = threading.Thread(target=self._loop)
-            self._thread.start()
-            print(f"thread {self.__class__.__name__} starting ...")
+            if self.threaded:
+                self._thread = threading.Thread(target=self._loop)
+                self._thread.daemon = True
+                self._thread.start()
+                print(f"thread {self.__class__.__name__} starting ...")
+            else:
+                self._loop()
         else:
             print(f"thread {self.__class__.__name__} already running")
 
 
-    def stop(self, force=False):
+    def stop(self, wait=100, force=False):
         if self.is_alive:
             print(f"thread {self.__class__.__name__} stopping ...")
             self.is_alive = False
+            time.sleep(wait * 1e-3)
             if force:
                 pass
         else:
@@ -74,14 +98,6 @@ class Threaded:
         else:
             return False
     
-    def get(self):
-        pass
-
-    def set(self):
-        pass
-
-    def iter(self):
-        pass
 
     def do_break(self):
         self.is_alive = False
@@ -98,8 +114,9 @@ class Threaded:
             # self._rate.limit_rate()
             t1 = time.time()
             self.iter()
-            if (time.time() - t1) < self._rate:
-                time.sleep(self._rate - (time.time() - t1))
+            self.iter_time = time.time() - t1
+            if self.iter_time < self._rate:
+                time.sleep(max(self._rate - (time.time() - t1), 0))
 
         print(f"thread {self.__class__.__name__} succesfully stopped.")
 

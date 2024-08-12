@@ -2,27 +2,37 @@ import threading
 import zmq
 import time
 import pickle
+import dbm
 import json
+
+import inspect
+import os
+from pathlib import Path
 
 from pynput.keyboard import Key, Listener
 
 import pyros2
-from pyros2.rate import Rate
+# from pyros2.rate import Rate
 from pyros2.topics import Topic, topic_parse, topic_packer, topic_code
 
 MASTER_IP = "localhost"
 MASTER_PORT = 8768
 
 class Node:
-    def __init__(self, hz=1000, autoupdate=True, publish=[], subscribe=[], start=True):
+    def __init__(self, hz=1000, autoupdate=True, save=False, file=None, publish=[], subscribe=[], start=True):
         self.autoupdate = autoupdate
         self.is_alive = False
-        self.saving = False
+        self.saving = save
         # self.rate = Rate(hz=hz)
         self._rate = 1/hz
+        self.start_time = None
         # self.protocol = protocol
         # self.mode = mode
         # self.config = config
+
+        self.file = None if file is None else dbm.open(file, "r")
+        self.playback_start_time = None
+        self.playback_counter = 1
 
         self.ip = MASTER_IP # "127.0.0.1"
         self.master_port = MASTER_PORT
@@ -46,11 +56,12 @@ class Node:
             self.sub_sock.subscribe(topics)
             self.sub_sock.setsockopt(zmq.SUBSCRIBE, topics.encode())
             self.recv_data[topics] = []
-            self.last_data[topics] = {} if topic_code(topics) == "jsn" else None
+            self.last_data[topics] = None # {} if topic_code(topics) == "jsn" else None
         
 
         self.pub_sock = self.ctx.socket(zmq.PUB) # SO_REUSEADDR
         self.pub_topics = ["main"] + publish
+        self.send_counter = 0
 
         while True:
             try:
@@ -70,7 +81,18 @@ class Node:
 
         time.sleep(0.5) # switch later to ack to make sure everything is ok
         msg = {"new_node":self.position}
-        self.pub_sock.send_multipart([b"ros0", self._make_info(), json.dumps(msg).encode()])
+        self.pub_sock.send_multipart([b"ros0", self._make_info().encode(), json.dumps(msg).encode()])
+
+        # logging
+        if self.saving:
+            # folder_name = Path(__file__).name.split(".")[0]
+            folder_name = os.path.basename(inspect.stack()[-1].filename).split(".")[0]
+            # log_name = time.strftime("%Y%m%d-%H%M%S") # + ".log"
+            log_name = "test"
+            output_file = pyros2.HOME / folder_name / log_name
+            output_file.parent.mkdir(exist_ok=True, parents=True)
+            # self.logger = open(output_file, "wb")
+            self.logger = dbm.open(output_file, "c")
 
         if start:
             self.start()
@@ -84,37 +106,63 @@ class Node:
         if topic not in self.sub_topics:
             self.sub_topics.append(topic)
             self.recv_data[topic] = []
-            self.last_data[topic] = {} if topic_code(topic) == "jsn" else None
+            self.last_data[topic] = None # {} if topic_code(topic) == "jsn" else None
         self.sub_sock.subscribe(topic)
         self.sub_sock.setsockopt(zmq.SUBSCRIBE, topic.encode())
+        return True
+    
+    def pub(self, topic):
+        self.pub_topics.append(topic)
+        return True
     
     def unsub(self, topic):
         self.sub_sock.unsubscribe(topic)
         self.sub_sock.setsockopt(zmq.UNSUBSCRIBE, topic.encode())
+        return True
 
     def __del__(self):
+        if self.saving and self.logger is not None:
+            self.logger["N"] = str(self.send_counter)
+            self.logger.close()
+            # time.sleep(1)
+            self.logger = None
         self.sub_sock.close()
         self.pub_sock.close()
         self.ctx.term()
 
-    def __getitem__(self, topic):
+    def __getitem__(self, index):
+        topic = index[0] if isinstance(index, tuple) else index
+        if isinstance(index, tuple):
+            configs = [index[i] for i in range(1,len(index))]
+        else:
+            configs = None
+        if topic not in self.sub_topics:
+            self.sub(topic)
+            # return None
+        ok = not self.autoupdate or len(self.recv_data[topic]) > 0
         if self.autoupdate and len(self.recv_data[topic]) > 0:
-            self._update(topic)
-        return self.last_data[topic]
+            ok = self._update(topic, configs)
+        return self.last_data[topic] if ok else None
     
 
     def __setitem__(self, topic, data):
-        if topic not in self.sub_topics:
-            self.sub(topic)
-        if topic_code(topic) == "jsn":
-            self.last_data[topic].update(data)
-        else:
-            self.last_data[topic] = data
+        if topic not in self.pub_topics:
+            self.pub(topic)
+        self.send(data, topic)
+
+    # def __setitem__(self, topic, data):
+    #     if topic not in self.sub_topics:
+    #         self.sub(topic)
+    #     if topic_code(topic) == "jsn":
+    #         self.last_data[topic].update(data)
+    #     else:
+    #         self.last_data[topic] = data
 
 
     def start(self):
         if not self.is_alive:
             self.is_alive = True
+            self.start_time = time.time()
             self.thread = threading.Thread(target=self._loop)
             self.thread.start()
         else:
@@ -123,6 +171,7 @@ class Node:
     def stop(self, force=False):
         if self.is_alive:
             self.is_alive = False
+            self.start_time = None
             if force:
                 pass
         else:
@@ -154,14 +203,18 @@ class Node:
         # return default
         return self.last_data[topic] if try_last and self.last_data[topic] is not None else default
 
-    def _update(self, topic):
+    def _update(self, topic, configs=None):
         ## only works for json currently
-        new_data = self.recv(topic)
+        n = 1 if configs is not None and pyros2.NEXT in configs else None
+        new_data = self.recv(topic, n=n)
+        if len(new_data) == 0 and configs is not None and pyros2.CLEAR in configs:
+            return False
         for data in new_data:
-            if topic_code(topic) == "jsn":
-                self.last_data[topic].update(data)
-            else:
+            if topic_code(topic) != "jsn":
                 self.last_data[topic] = data
+            else:
+                self.last_data[topic].update(data)
+        return True
     
     def update(self, topic=None):
         if topic is None:
@@ -180,21 +233,42 @@ class Node:
     #         self.send(self.states)
     #     return None
 
-    def send(self, dat, topic="main"):
-        dat = (topic.encode(), self._make_info(), self._topic_packer(topic)(dat))
+    def send(self, inp_dat, topic="main", info=None):
+        self.send_counter += 1
+        send_info = info if info is not None else self._make_info()
+        dat = (topic.encode(), send_info.encode(), self._topic_packer(topic)(inp_dat))
         self.send_data.append(dat)
+        # log_dat = {"topic": topic, "info": send_info, "data": self._topic_packer(topic)(dat)}
+        # self.logger.write(log_dat)
+        # json.dump(log_dat, self.logger)
+        # log_dat = {"topic": topic, "info": send_info, "data": dat}
+        if self.saving:
+            log_dat = (topic, send_info, inp_dat)
+            # pickle.dump(log_dat, self.logger, protocol=pickle.HIGHEST_PROTOCOL)
+            self.logger[str(self.send_counter)] = pickle.dumps(log_dat, protocol=pickle.HIGHEST_PROTOCOL)
+            
         return True
 
-    def recv(self, topic="main", last=False):
-        dats = self.recv_data[topic].copy()
-        self.recv_data[topic].clear()
+    def recv(self, topic="main", last=False, n=None):
+        if n is None:
+            dats = self.recv_data[topic].copy()
+            self.recv_data[topic].clear()
+        else:
+            n = min(n, len(self.recv_data))
+            dats = self.recv_data[topic][:n].copy()
+            self.recv_data[topic] = self.recv_data[topic][n:]
         return [self._topic_parser(topic)(dat[1]) for dat in dats]
         # return [self._topic_parser(topic)(dats[-1][1])] if len(dats) > 0 else []
     
+    def recv_n(self, topic="main", n=1):
+        dat = self.recv_data[topic][:n]
+        self.recv_data[topic].clear()
+        return [self._topic_parser(topic)(dat[1])]
+
     def _make_info(self):
         info = {}
         info["time"] = time.time()
-        return json.dumps(info).encode()
+        return json.dumps(info) #.encode()
 
     def info(self):
         return self.is_alive
@@ -246,6 +320,29 @@ class Node:
                 # print("sent ", json.loads(info.decode()))
             self.send_data = []
 
+            if self.file is not None and self.playback_counter < int(self.file["N"]):
+                topic, msg_info, dat = pickle.loads(self.file[str(self.playback_counter)])
+                dict_info = json.loads(msg_info)
+                # self.send(dat, topic) ## remove
+                # self.playback_counter += 1 ## remove
+                # print(self.playback_counter)
+
+                if self.playback_start_time is None:
+                    self.playback_start_time = dict_info["time"]
+                else:
+                    while (time.time() - self.start_time) > (dict_info["time"] - self.playback_start_time):
+                        # print("dict delta time", dict_info["time"] - self.playback_start_time)
+                        # print("node delta time", time.time() - self.start_time)
+                        # print("++")
+                        self.send(dat, topic)
+                        self.playback_counter += 1
+                        if self.playback_counter >= int(self.file["N"]):
+                            break
+                        topic, msg_info, dat = pickle.loads(self.file[str(self.playback_counter)])
+                        dict_info = json.loads(msg_info)
+
+                print(self.playback_counter)
+
             if (time.time() - t1) < self._rate:
                 time.sleep(max(self._rate - (time.time() - t1), 0))
                     
@@ -265,16 +362,29 @@ if __name__=="__main__":
 
     if sys.argv[1] == "1":
         node = Node()
-        node["carstate-jsn"] = {"test":10}
-        node["numbers-str"] = "hello world"
-        node["lidar-pyo"] = None
+        # node["carstate-jsn"] = {"test":10}
+        # node["numbers-str"] = "hello world"
+        # node["lidar-pyo"] = None
 
         while node.alive(wait=100):
             # node.update()
             # print(b.get(last=True), end="\r")
             # node.send(counter)
             # print(node["carstate-jsn"])
-            print(node["numbers-str"])
+            # print(node["numbers-str"])
+            joy_data = node["joystick", pyros2.CLEAR, pyros2.NEXT]
+            if joy_data is not None:
+                print(joy_data)
+            
+
+            gps_state = node["gps_state"]
+            if gps_state is not None:
+                print(gps_state)
+
+            
+            nums = node["numbers", pyros2.CLEAR]
+            if nums is not None:
+                print(nums)
             # print(node["lidar-pyo"])
             # print(b.get("letters-str"))
             counter += 1
@@ -284,12 +394,15 @@ if __name__=="__main__":
     elif sys.argv[1] == "2":
         b = Node()
 
-        while b.alive(wait=100):
+        while b.alive(wait=10):
             # b.send_data.append(f"{counter}".encode())
-            b.send(f"{1000+counter}", "numbers-str")
+            # b.send(f"{1000+counter}", "numbers-str")
+            b["numbers"] = 1000+counter
             # print(b.recv()) # print("Ping pong.")
             # print(b.get())
+            print(1000+counter)
             counter += 1
+
 
         print("node.py | client closing ...")
     
@@ -301,6 +414,20 @@ if __name__=="__main__":
             b.send(f"{5000+counter}", "letters-str")
             print(b.recv()) # print("Ping pong.")
             # print(b.get())
+            counter += 1
+
+        print("node.py | client closing ...")
+
+    
+    elif sys.argv[1] == "playback":
+        b = Node(file=pyros2.HOME / "joystick" / "test")
+
+        while b.alive(wait=100):
+            # b.send_data.append(f"{counter}".encode())
+            # b.send(f"{5000+counter}", "letters-str")
+            # print(b.recv()) # print("Ping pong.")
+            # print(b.get())
+            # print(None)
             counter += 1
 
         print("node.py | client closing ...")

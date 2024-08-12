@@ -15,7 +15,7 @@ def null(x):
 
 def topic_code(topic):
     ts = topic.split(TOPIC_SPLIT)
-    topic_code = ts[-1] if len(ts) > 1 and len(ts[-1]) == 3 else "jsn" # None
+    topic_code = ts[-1] if len(ts) > 1 and len(ts[-1]) == 3 else None # "jsn" # None
     return topic_code
 
 
