@@ -22,7 +22,7 @@ setup(
     package_dir={
         'pyros2': 'pyros2'
     },
-    entry_points={"console_scripts": ["ros0 = ros0.main:main"]},
+    entry_points={"console_scripts": ["pyros2 = pyros2.main:main"]},
     classifiers=(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

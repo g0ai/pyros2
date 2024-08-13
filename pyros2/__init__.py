@@ -3,8 +3,9 @@ from pathlib import Path
 HOME = Path.home() / "pyros2"
 
 from pyros2.node import Node
+from pyros2.threaded import Threaded
 
-CLEAR = 2
+ONCE = 2
 NEXT = 3
 
 # # protocol

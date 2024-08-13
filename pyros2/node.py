@@ -207,7 +207,7 @@ class Node:
         ## only works for json currently
         n = 1 if configs is not None and pyros2.NEXT in configs else None
         new_data = self.recv(topic, n=n)
-        if len(new_data) == 0 and configs is not None and pyros2.CLEAR in configs:
+        if len(new_data) == 0 and configs is not None and pyros2.ONCE in configs:
             return False
         for data in new_data:
             if topic_code(topic) != "jsn":
@@ -372,7 +372,7 @@ if __name__=="__main__":
             # node.send(counter)
             # print(node["carstate-jsn"])
             # print(node["numbers-str"])
-            joy_data = node["joystick", pyros2.CLEAR, pyros2.NEXT]
+            joy_data = node["joystick", pyros2.ONCE, pyros2.NEXT]
             if joy_data is not None:
                 print(joy_data)
             
@@ -382,7 +382,7 @@ if __name__=="__main__":
                 print(gps_state)
 
             
-            nums = node["numbers", pyros2.CLEAR]
+            nums = node["numbers", pyros2.ONCE]
             if nums is not None:
                 print(nums)
             # print(node["lidar-pyo"])
