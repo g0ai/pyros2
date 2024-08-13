@@ -92,7 +92,7 @@ class Node:
             output_file = pyros2.HOME / folder_name / log_name
             output_file.parent.mkdir(exist_ok=True, parents=True)
             # self.logger = open(output_file, "wb")
-            self.logger = dbm.open(output_file, "c")
+            self.logger = dbm.open(str(output_file), "c")
 
         if start:
             self.start()
