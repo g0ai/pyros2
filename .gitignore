@@ -163,4 +163,4 @@ cython_debug/
 
 
 # exclude sphinx docs
-!docs/build/html/
+!docs/build/html
