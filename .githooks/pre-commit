@@ -13,7 +13,7 @@ COVERAGE=coverage
 if [[ -z $(which $COVERAGE) ]]; then
   COVERAGE=python-coverage
 fi
-if ! $COVERAGE run --source='.' -m unittest discover --pattern='*_test.py'; then
+if ! $COVERAGE run --source='.' -m unittest discover --pattern='test_*.py'; then
   echo "TESTS FAILED" 1>&2
   exit 1
 fi
@@ -21,7 +21,7 @@ fi
 # Run everything through the linter
 git ls-files | grep '\.py$' \
   | xargs pylint \
-      --rcfile=git-hooks/pylintrc \
+      --rcfile=.githooks/pylintrc \
       --output-format=colorized \
       --reports=n
 # pylint return codes described here:
