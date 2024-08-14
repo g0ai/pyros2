@@ -6,7 +6,7 @@ import paramiko
 ssh_host = "192.168.100.125"
 ssh_port = 22
 ssh_user = "ibrahim"
-ssh_password = "bold"
+ssh_password = "password"
 
 # Remote and Local Ports
 # remote_port = 5555  # Port where the publisher is bound

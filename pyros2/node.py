@@ -36,8 +36,8 @@ class Node:
         # self.config = config
         self.ssh_server = ssh_server
 
-        if ssh_server is not None:
-            self.tunnel = create_ssh_tunnel(MASTER_PORT, MASTER_PORT)
+        # if ssh_server is not None:
+        #     self.tunnel = create_ssh_tunnel(MASTER_PORT, MASTER_PORT)
 
         self.file = None if file is None else dbm.open(file, "r")
         self.playback_start_time = None
@@ -45,7 +45,7 @@ class Node:
 
         self.ip = MASTER_IP # "127.0.0.1"
         self.master_port = MASTER_PORT
-        self.position = 1
+        self.position = 2
 
         self.thread = None
         self.trigger = Listener(on_press=self._trigger)
@@ -86,7 +86,7 @@ class Node:
 
                 # print("Already in use.")
                 # self.sub_sock.connect(f"tcp://{self.ip}:{self.node_port}")
-        print(f"New node_port: {self._node_port()}")
+        print(f"My node_port: {self._node_port()}")
 
         # self.sub_sock.connect(f"tcp://{self.ip}:{self.port}")
         for i in range(self.position):
@@ -322,7 +322,8 @@ class Node:
                         if topic == "ros0":
                             msg = json.loads(dat)
                             if "new_node" in msg:
-                                self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg['new_node'])}")
+                                # self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg['new_node'])}")
+                                self.sub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg['new_node'])}")
                                 print(f"New node found at {msg['new_node']}!")
                         elif topic in self.sub_topics:
                             self.recv_data[topic].append((recv_time_ns, dat))
