@@ -39,8 +39,8 @@ print(f"Recieved {counter} on topic 'counter'")
 
 The following flags are supported:
 
-- `ONCE`: read new value only once; next call is either a newer value or `None`
-- `NEXT`: read the next recieved value (default is reading the latest value)
+- `ONCE`: read new value only once; next call is either a newer value or `None` (default is last received value)
+- `NEXT`: read the next recieved value, even if much newer values exist (default is reading the latest value)
 - `WAIT`: wait until a message is recieved (default is non-blocking)
 - `NOUPDATE`: get the last returned cached value (default is check for new and get latest)
 
