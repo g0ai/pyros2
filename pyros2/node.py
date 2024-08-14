@@ -20,8 +20,9 @@ import pyros2
 from pyros2.topics import Topic, topic_parse, topic_packer, topic_code
 from pyros2.remote_ssh import create_ssh_tunnel
 
-MASTER_IP = "localhost"
+MASTER_IP = "localhost" #  "192.168.100.107"
 MASTER_PORT = 8768
+MAX_NODES = 10
 
 class Node:
     def __init__(self, hz=1000, autoupdate=True, save=False, file=None, ssh_server=None, publish=[], subscribe=[], start=True):
@@ -35,6 +36,7 @@ class Node:
         # self.mode = mode
         # self.config = config
         self.ssh_server = ssh_server
+        self.tunnels = []
 
         # if ssh_server is not None:
         #     self.tunnel = create_ssh_tunnel(MASTER_PORT, MASTER_PORT)
@@ -45,7 +47,7 @@ class Node:
 
         self.ip = MASTER_IP # "127.0.0.1"
         self.master_port = MASTER_PORT
-        self.position = 2
+        self.position = 1
 
         self.thread = None
         self.trigger = Listener(on_press=self._trigger)
@@ -89,12 +91,12 @@ class Node:
         print(f"My node_port: {self._node_port()}")
 
         # self.sub_sock.connect(f"tcp://{self.ip}:{self.port}")
-        for i in range(self.position):
+        for i in range(MAX_NODES): # self.position):
             conn = f"tcp://{self.ip}:{self._node_port(i)}"
             if self.ssh_server is None:
                 self.sub_sock.connect(conn)
             else:
-                self.tunnel = ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = "bold")
+                self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = "bold"))
         
 
         time.sleep(0.5) # switch later to ack to make sure everything is ok
@@ -315,6 +317,7 @@ class Node:
                     # dat = self.sub_sock.recv()
                     topic, info, dat = self.sub_sock.recv_multipart(zmq.NOBLOCK)
                     topic = topic.decode()
+                    print(topic)
                     info = json.loads(info)
                     # print("> ", topic, info, dat)
                     recv_time_ns = time.perf_counter_ns()
@@ -323,7 +326,11 @@ class Node:
                             msg = json.loads(dat)
                             if "new_node" in msg:
                                 # self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg['new_node'])}")
-                                self.sub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg['new_node'])}")
+                                conn = f"tcp://{self.ip}:{self._node_port(msg['new_node'])}"
+                                if self.ssh_server is None:
+                                    self.sub_sock.connect(conn)
+                                else:
+                                    self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, self.ssh_server, password = "bold"))
                                 print(f"New node found at {msg['new_node']}!")
                         elif topic in self.sub_topics:
                             self.recv_data[topic].append((recv_time_ns, dat))
@@ -454,8 +461,8 @@ if __name__=="__main__":
 
     
     elif sys.argv[1] == "ssh":
-        # b = Node(ssh_server="ibrahim@192.168.100.125")
-        b = Node()
+        b = Node(ssh_server="ibrahim@192.168.100.125")
+        # b = Node()
 
         while b.alive(wait=100):
             # b.send_data.append(f"{counter}".encode())
@@ -463,7 +470,9 @@ if __name__=="__main__":
             # print(b.recv()) # print("Ping pong.")
             # print(b.get())
             # print(None)
-            print(b["ssh"])
+            res = b["numbers"]
+            if res is not None:
+                print(res)
             # b["numbers"] = counter + 3000
             # print(counter + 3000)
             counter += 1
