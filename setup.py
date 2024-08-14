@@ -10,7 +10,7 @@ long_description = "Minimalistic ros-compatible python bridge."
 
 setup(
     name="pyros2",
-    version="1.0.0",
+    version="0.1.0",
     author="Ibrahim Abdulhafiz",
     author_email="ibrahim@g0ai.com",
     url="https://github.com/G0ai/pyros2",
