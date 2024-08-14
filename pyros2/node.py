@@ -9,17 +9,22 @@ import inspect
 import os
 from pathlib import Path
 
+
+from zmq import ssh
+import paramiko
+
 from pynput.keyboard import Key, Listener
 
 import pyros2
 # from pyros2.rate import Rate
 from pyros2.topics import Topic, topic_parse, topic_packer, topic_code
+from pyros2.remote_ssh import create_ssh_tunnel
 
 MASTER_IP = "localhost"
 MASTER_PORT = 8768
 
 class Node:
-    def __init__(self, hz=1000, autoupdate=True, save=False, file=None, publish=[], subscribe=[], start=True):
+    def __init__(self, hz=1000, autoupdate=True, save=False, file=None, ssh_server=None, publish=[], subscribe=[], start=True):
         self.autoupdate = autoupdate
         self.is_alive = False
         self.saving = save
@@ -29,6 +34,10 @@ class Node:
         # self.protocol = protocol
         # self.mode = mode
         # self.config = config
+        self.ssh_server = ssh_server
+
+        if ssh_server is not None:
+            self.tunnel = create_ssh_tunnel(MASTER_PORT, MASTER_PORT)
 
         self.file = None if file is None else dbm.open(file, "r")
         self.playback_start_time = None
@@ -63,9 +72,14 @@ class Node:
         self.pub_topics = ["main"] + publish
         self.send_counter = 0
 
+
         while True:
             try:
-                self.sub_sock.bind(f"tcp://*:{self._node_port()}")
+                self.pub_sock.bind(f"tcp://*:{self._node_port()}")
+                # if self.ssh_server is None:
+                #     self.pub_sock.bind(f"tcp://*:{self._node_port()}")
+                # else:
+                #     self.tunnel = ssh.tunnel_connection(self.sub_sock, self.conn, ssh_server, password = "password")
                 break
             except zmq.ZMQError as e:
                 self.position += 1
@@ -76,7 +90,11 @@ class Node:
 
         # self.sub_sock.connect(f"tcp://{self.ip}:{self.port}")
         for i in range(self.position):
-            self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(i)}")
+            conn = f"tcp://{self.ip}:{self._node_port(i)}"
+            if self.ssh_server is None:
+                self.sub_sock.connect(conn)
+            else:
+                self.tunnel = ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = "bold")
         
 
         time.sleep(0.5) # switch later to ack to make sure everything is ok
@@ -428,6 +446,25 @@ if __name__=="__main__":
             # print(b.recv()) # print("Ping pong.")
             # print(b.get())
             # print(None)
+            counter += 1
+
+        print("node.py | client closing ...")
+    
+
+    
+    elif sys.argv[1] == "ssh":
+        # b = Node(ssh_server="ibrahim@192.168.100.125")
+        b = Node()
+
+        while b.alive(wait=100):
+            # b.send_data.append(f"{counter}".encode())
+            # b.send(f"{5000+counter}", "letters-str")
+            # print(b.recv()) # print("Ping pong.")
+            # print(b.get())
+            # print(None)
+            print(b["ssh"])
+            # b["numbers"] = counter + 3000
+            # print(counter + 3000)
             counter += 1
 
         print("node.py | client closing ...")
