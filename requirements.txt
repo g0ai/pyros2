@@ -1,7 +1,7 @@
-pyzmq
-pynput
+pyzmq #==26.0.3
+pynput #==1.7.7
 
 # for ssh
-paramiko
-pexpect
-netifaces
+paramiko #==3.4.1
+pexpect #==4.9.0
+netifaces #==0.11.0

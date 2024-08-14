@@ -26,6 +26,7 @@ MASTER_PORT = 8768
 MAX_NODES = 10
 
 WAIT_TIME = 0.001
+SLOWDOWN = 0.25
 
 class Node:
     def __init__(self, hz=1000, autoupdate=True, save=False, file=None, ssh_server=None, ssh_pass="", publish=[], subscribe=[], start=True):
@@ -108,7 +109,7 @@ class Node:
                     self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = self.ssh_pass))
         
 
-        time.sleep(0.5) # switch later to ack to make sure everything is ok
+        time.sleep(SLOWDOWN) # switch later to ack to make sure everything is ok
         msg = {"new_node":self.position}
         self.pub_sock.send_multipart([b"ros0", self._make_info().encode(), json.dumps(msg).encode()])
 
@@ -150,6 +151,13 @@ class Node:
         return True
 
     def __del__(self):
+        self.close()
+
+    def close(self):
+        if self.is_alive:
+            self.stop()
+            time.sleep(SLOWDOWN)
+        ##
         if self.saving and self.logger is not None:
             self.logger["N"] = str(self.send_counter)
             self.logger.close()
@@ -381,7 +389,8 @@ class Node:
                                         self.sub_sock.connect(conn)
                                     else:
                                         self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, self.ssh_server, password = self.ssh_pass))
-                                    print(f"New node found at {msg['new_node']}!")
+                                    if self.position != msg['new_node']:
+                                        print(f"New node found at {msg['new_node']}!")
                         elif topic in self.sub_topics:
                             self.recv_data[topic].append((recv_time_ns, dat))
                         # dat_dict = pickle.loads(dat)
@@ -423,8 +432,8 @@ class Node:
                 time.sleep(max(self._rate - (time.time() - t1), 0))
                     
 
-        print("Node stopped")
-        self.__del__()
+        print(f"Node {self.position} @ {self._node_port()} stopped.")
+        self.close()
 
 
 

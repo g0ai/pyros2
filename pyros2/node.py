@@ -16,6 +16,10 @@ def wait(ms=0):
     return _node.alive(wait=ms)
 
 
+def close():
+    return _node.close()
+
+
 def ok():
     return _node.alive(wait=0)
 
