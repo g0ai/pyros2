@@ -317,7 +317,6 @@ class Node:
                     # dat = self.sub_sock.recv()
                     topic, info, dat = self.sub_sock.recv_multipart(zmq.NOBLOCK)
                     topic = topic.decode()
-                    print(topic)
                     info = json.loads(info)
                     # print("> ", topic, info, dat)
                     recv_time_ns = time.perf_counter_ns()
