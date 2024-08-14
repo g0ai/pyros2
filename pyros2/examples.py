@@ -3,7 +3,7 @@
 import pyros2
 import time
 from pyros2 import Node
-from pyros2 import nd
+from pyros2 import node as nd
 
 
 if __name__=="__main__":
