@@ -46,11 +46,11 @@ class Node:
         self.playback_start_time = None
         self.playback_counter = 1
 
-        self.ip = MASTER_IP # "127.0.0.1"
-        self.ips = [MASTER_IP] # ip4_addresses()
+        self.ip = MASTER_IP if self.ssh_server is None else self.ssh_server.split("@")[1] # "127.0.0.1"
+        self.ips = [self.ip] # ip4_addresses()
         # print(ip4_addresses())
         self.master_port = MASTER_PORT
-        self.position = 1
+        self.position = 3
 
         self.thread = None
         self.trigger = Listener(on_press=self._trigger)
