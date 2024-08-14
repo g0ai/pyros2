@@ -14,8 +14,9 @@ def ip4_addresses():
     return ip_list
 
 
+# TODO
 def get_nodes():
-    ctx = 
+    ctx = None
 
 if __name__=="__main__":
     # interface = nt.interfaces()

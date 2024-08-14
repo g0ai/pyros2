@@ -161,28 +161,35 @@ class Node:
 
     def __getitem__(self, index):
         topic = index[0] if isinstance(index, tuple) else index
+        if topic not in self.sub_topics:
+            self.sub(topic)
+        autoupdate = self.autoupdate
         if isinstance(index, tuple):
             configs = [index[i] for i in range(1,len(index))]
-            if pyros2.FREEZE in configs and self.last_data[topic] is not None:
-                if self.frozen[topic]:
-                    return self.last_data[topic]
-                else:
-                    self.frozen[topic] = True
-            else:
-                self.frozen[topic] = False
+            # if pyros2.FREEZE in configs and self.last_data[topic] is not None:
+            #     if self.frozen[topic]:
+            #         return self.last_data[topic]
+            #     else:
+            #         self.frozen[topic] = True
+            # elif pyros2.REFREEZE in configs and self.last_data[topic] is not None:
+            #     pass
+            # else:
+            #     self.frozen[topic] = False
+            # autoupdate = False if pyros2.NOUPDATE in configs else autoupdate
+            if pyros2.NOUPDATE in configs:
+                return self.last_data[topic]
 
         else:
             configs = None
-        if topic not in self.sub_topics:
-            self.sub(topic)
+            self.frozen[topic] = False
             # return None
-        ok = not self.autoupdate or len(self.recv_data[topic]) > 0
-        
-        if pyros2.WAIT in configs and not ok:
+        ok = not autoupdate or len(self.recv_data[topic]) > 0
+
+        if configs is not None and pyros2.WAIT in configs and not ok:
             while len(self.recv_data[topic]) == 0:
                 time.sleep(WAIT_TIME)
         
-        if self.autoupdate and len(self.recv_data[topic]) > 0:
+        if autoupdate and len(self.recv_data[topic]) > 0:
             ok = self._update(topic, configs)
         return self.last_data[topic] if ok else None
     
@@ -430,9 +437,13 @@ if __name__=="__main__":
                 print(gps_state)
 
             
-            nums = node["numbers", pyros2.NEXT, pyros2.ONCE]
+            nums = node["numbers", pyros2.ONCE]
             if nums is not None:
+                print("________________")
                 print(nums)
+                print("again > ", node["numbers", pyros2.NOUPDATE])
+                print("again > ", node["numbers", pyros2.NOUPDATE])
+                print("last > ", node["numbers", pyros2.NOUPDATE])
             # print(node["lidar-pyo"])
             # print(b.get("letters-str"))
             counter += 1
