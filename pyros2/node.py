@@ -19,6 +19,7 @@ import pyros2
 # from pyros2.rate import Rate
 from pyros2.topics import Topic, topic_parse, topic_packer, topic_code
 from pyros2.remote_ssh import create_ssh_tunnel
+from pyros2.utils import ip4_addresses
 
 MASTER_IP = "localhost" #  "192.168.100.107"
 MASTER_PORT = 8768
@@ -46,6 +47,8 @@ class Node:
         self.playback_counter = 1
 
         self.ip = MASTER_IP # "127.0.0.1"
+        self.ips = [MASTER_IP] # ip4_addresses()
+        # print(ip4_addresses())
         self.master_port = MASTER_PORT
         self.position = 1
 
@@ -92,11 +95,12 @@ class Node:
 
         # self.sub_sock.connect(f"tcp://{self.ip}:{self.port}")
         for i in range(MAX_NODES): # self.position):
-            conn = f"tcp://{self.ip}:{self._node_port(i)}"
-            if self.ssh_server is None:
-                self.sub_sock.connect(conn)
-            else:
-                self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = "bold"))
+            for ip in self.ips:
+                conn = f"tcp://{ip}:{self._node_port(i)}"
+                if self.ssh_server is None:
+                    self.sub_sock.connect(conn)
+                else:
+                    self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = "bold"))
         
 
         time.sleep(0.5) # switch later to ack to make sure everything is ok
@@ -325,12 +329,13 @@ class Node:
                             msg = json.loads(dat)
                             if "new_node" in msg:
                                 # self.pub_sock.connect(f"tcp://{self.ip}:{self._node_port(msg['new_node'])}")
-                                conn = f"tcp://{self.ip}:{self._node_port(msg['new_node'])}"
-                                if self.ssh_server is None:
-                                    self.sub_sock.connect(conn)
-                                else:
-                                    self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, self.ssh_server, password = "bold"))
-                                print(f"New node found at {msg['new_node']}!")
+                                for ip in self.ips:
+                                    conn = f"tcp://{ip}:{self._node_port(msg['new_node'])}"
+                                    if self.ssh_server is None:
+                                        self.sub_sock.connect(conn)
+                                    else:
+                                        self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, self.ssh_server, password = "bold"))
+                                    print(f"New node found at {msg['new_node']}!")
                         elif topic in self.sub_topics:
                             self.recv_data[topic].append((recv_time_ns, dat))
                         # dat_dict = pickle.loads(dat)
@@ -407,7 +412,7 @@ if __name__=="__main__":
                 print(gps_state)
 
             
-            nums = node["numbers", pyros2.ONCE]
+            nums = node["numbers", pyros2.NEXT, pyros2.ONCE]
             if nums is not None:
                 print(nums)
             # print(node["lidar-pyo"])
@@ -419,7 +424,7 @@ if __name__=="__main__":
     elif sys.argv[1] == "2":
         b = Node()
 
-        while b.alive(wait=10):
+        while b.alive(wait=50):
             # b.send_data.append(f"{counter}".encode())
             # b.send(f"{1000+counter}", "numbers-str")
             b["numbers"] = 1000+counter
