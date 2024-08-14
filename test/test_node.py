@@ -13,8 +13,8 @@ class TestNodeCase(unittest.TestCase):
         resp = node1.get("test", pyros2.WAIT)
         self.assertEqual(val, resp)
 
-        node1.close()
-        node.close()
+        # node1.close()
+        # node.close()
 
 if __name__ == '__main__':
     unittest.main()

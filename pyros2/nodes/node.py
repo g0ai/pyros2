@@ -7,7 +7,6 @@ import json
 
 import inspect
 import os
-from pathlib import Path
 
 
 from zmq import ssh
@@ -17,11 +16,9 @@ from pynput.keyboard import Key, Listener
 
 import pyros2
 from pyros2.topics import Topic, topic_parse, topic_packer, topic_code
-# from pyros2.rate import Rate
-# from pyros2.remote_ssh import create_ssh_tunnel
-# from pyros2.utils import ip4_addresses
 
-MASTER_IP = "localhost" #  "192.168.100.107"
+
+MASTER_IP = "localhost"
 MASTER_PORT = 8768
 MAX_NODES = 10
 
@@ -220,7 +217,7 @@ class Node:
         if not self.is_alive:
             self.is_alive = True
             self.start_time = time.time()
-            self.thread = threading.Thread(target=self._loop)
+            self.thread = threading.Thread(target=self._loop, daemon=True)
             self.thread.start()
         else:
             print(f"Node already running ...")

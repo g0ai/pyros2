@@ -129,4 +129,4 @@ if __name__=="__main__":
     while b.alive(wait=100):
         print("Ping.")
 
-    print("bridge.py | server closing ...")
+    print("threaded.py | server closing ...")
