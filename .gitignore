@@ -8,8 +8,9 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/*
-docs/build/*
+build/
+# build/*
+# docs/build/*
 develop-eggs/
 dist/
 downloads/
@@ -163,5 +164,5 @@ cython_debug/
 #.idea/
 
 
-# exclude sphinx docs
-!docs/build/html
+# # exclude sphinx docs
+# !docs/build/html
