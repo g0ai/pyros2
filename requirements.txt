@@ -3,5 +3,5 @@ pynput
 
 # for ssh
 paramiko
-pexpet
+pexpect
 netifaces
