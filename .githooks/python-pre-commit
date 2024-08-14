@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# This file runs test coverage and looks for lint errors in python code. It is
+# intended to be used as part of a submodule called git-hooks.
+#
+# You probably don't want to use this file directly unless you are doing
+# something clever and custom. Instead, you should prefer to have this file
+# called from the pre-commit script if there is python code under source
+# control. See the header of that script for more information.
+
+# Run unit tests
+COVERAGE=coverage
+if [[ -z $(which $COVERAGE) ]]; then
+  COVERAGE=python-coverage
+fi
+if ! $COVERAGE run --source='.' -m unittest discover --pattern='*_test.py'; then
+  echo "TESTS FAILED" 1>&2
+  exit 1
+fi
+
+# Run everything through the linter
+git ls-files | grep '\.py$' \
+  | xargs pylint \
+      --rcfile=git-hooks/pylintrc \
+      --output-format=colorized \
+      --reports=n
+# pylint return codes described here:
+#   https://lists.logilab.org/pipermail/python-projects/2009-November/002068.html
+# We only care about fatal messages and errors, the existence of which are
+# assigned to bits 0 and 1 of the return code, respectively.
+if [[ $(( $? & 3 )) -ne 0 ]]; then
+  echo "LINTER FAILED" 1>&2
+  echo "Fix all errors and fatal messages" 1>&2
+  exit 1
+fi
