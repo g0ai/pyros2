@@ -1,6 +1,7 @@
 import netifaces as nt
 
 from icecream import ic
+import zmq
 
 def ip4_addresses():
     ip_list = []
@@ -11,6 +12,10 @@ def ip4_addresses():
             for link in links:
                 ip_list.append(link["addr"])
     return ip_list
+
+
+def get_nodes():
+    ctx = 
 
 if __name__=="__main__":
     # interface = nt.interfaces()

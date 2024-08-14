@@ -25,8 +25,10 @@ MASTER_IP = "localhost" #  "192.168.100.107"
 MASTER_PORT = 8768
 MAX_NODES = 10
 
+WAIT_TIME = 0.001
+
 class Node:
-    def __init__(self, hz=1000, autoupdate=True, save=False, file=None, ssh_server=None, publish=[], subscribe=[], start=True):
+    def __init__(self, hz=1000, autoupdate=True, save=False, file=None, ssh_server=None, ssh_pass="", publish=[], subscribe=[], start=True):
         self.autoupdate = autoupdate
         self.is_alive = False
         self.saving = save
@@ -37,6 +39,7 @@ class Node:
         # self.mode = mode
         # self.config = config
         self.ssh_server = ssh_server
+        self.ssh_pass = ssh_pass
         self.tunnels = []
 
         # if ssh_server is not None:
@@ -60,17 +63,19 @@ class Node:
         self.send_data = [] # [pickle.dumps("hello")]
 
         self.last_data = {}
+        self.frozen = {}
 
         self.ctx = zmq.Context()
 
         self.sub_sock = self.ctx.socket(zmq.SUB)
         self.sub_topics = ["ros0", "main"] + subscribe
 
-        for topics in self.sub_topics:
-            self.sub_sock.subscribe(topics)
-            self.sub_sock.setsockopt(zmq.SUBSCRIBE, topics.encode())
-            self.recv_data[topics] = []
-            self.last_data[topics] = None # {} if topic_code(topics) == "jsn" else None
+        for topic in self.sub_topics:
+            self.sub_sock.subscribe(topic)
+            self.sub_sock.setsockopt(zmq.SUBSCRIBE, topic.encode())
+            self.recv_data[topic] = []
+            self.last_data[topic] = None # {} if topic_code(topic) == "jsn" else None
+            self.frozen[topic] = False
         
 
         self.pub_sock = self.ctx.socket(zmq.PUB) # SO_REUSEADDR
@@ -100,7 +105,7 @@ class Node:
                 if self.ssh_server is None:
                     self.sub_sock.connect(conn)
                 else:
-                    self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = "bold"))
+                    self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = self.ssh_pass))
         
 
         time.sleep(0.5) # switch later to ack to make sure everything is ok
@@ -158,12 +163,25 @@ class Node:
         topic = index[0] if isinstance(index, tuple) else index
         if isinstance(index, tuple):
             configs = [index[i] for i in range(1,len(index))]
+            if pyros2.FREEZE in configs and self.last_data[topic] is not None:
+                if self.frozen[topic]:
+                    return self.last_data[topic]
+                else:
+                    self.frozen[topic] = True
+            else:
+                self.frozen[topic] = False
+
         else:
             configs = None
         if topic not in self.sub_topics:
             self.sub(topic)
             # return None
         ok = not self.autoupdate or len(self.recv_data[topic]) > 0
+        
+        if pyros2.WAIT in configs and not ok:
+            while len(self.recv_data[topic]) == 0:
+                time.sleep(WAIT_TIME)
+        
         if self.autoupdate and len(self.recv_data[topic]) > 0:
             ok = self._update(topic, configs)
         return self.last_data[topic] if ok else None
@@ -334,7 +352,7 @@ class Node:
                                     if self.ssh_server is None:
                                         self.sub_sock.connect(conn)
                                     else:
-                                        self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, self.ssh_server, password = "bold"))
+                                        self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, self.ssh_server, password = self.ssh_pass))
                                     print(f"New node found at {msg['new_node']}!")
                         elif topic in self.sub_topics:
                             self.recv_data[topic].append((recv_time_ns, dat))
