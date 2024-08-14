@@ -1,3 +1,0 @@
-[build-system]
-requires = ["setuptools", "pathlib"]
-build-backend = "setuptools.build_meta"
