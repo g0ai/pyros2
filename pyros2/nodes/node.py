@@ -16,10 +16,10 @@ import paramiko
 from pynput.keyboard import Key, Listener
 
 import pyros2
-# from pyros2.rate import Rate
 from pyros2.topics import Topic, topic_parse, topic_packer, topic_code
-from pyros2.remote_ssh import create_ssh_tunnel
-from pyros2.utils import ip4_addresses
+# from pyros2.rate import Rate
+# from pyros2.remote_ssh import create_ssh_tunnel
+# from pyros2.utils import ip4_addresses
 
 MASTER_IP = "localhost" #  "192.168.100.107"
 MASTER_PORT = 8768
@@ -53,7 +53,7 @@ class Node:
         self.ips = [self.ip] # ip4_addresses()
         # print(ip4_addresses())
         self.master_port = MASTER_PORT
-        self.position = 3
+        self.position = 1
 
         self.thread = None
         self.trigger = Listener(on_press=self._trigger)
@@ -244,13 +244,34 @@ class Node:
     #         return self.states[name]
     #     return default
 
-    def get(self, topic="main", default=None, try_last=True):
-        new_data = self.recv(topic)
-        if len(new_data) > 0:
-            self.last_data[topic] = new_data[-1]
-            return new_data[-1]
-        # return default
-        return self.last_data[topic] if try_last and self.last_data[topic] is not None else default
+    def get(self, topic, *configs):
+        if topic not in self.sub_topics:
+            self.sub(topic)
+        autoupdate = self.autoupdate
+        is_config = len(configs) > 0
+        if is_config:
+            if pyros2.NOUPDATE in configs:
+                return self.last_data[topic]
+
+        else:
+            configs = None
+            self.frozen[topic] = False
+            # return None
+        ok = not autoupdate or len(self.recv_data[topic]) > 0
+
+        if is_config and pyros2.WAIT in configs and not ok:
+            while len(self.recv_data[topic]) == 0:
+                time.sleep(WAIT_TIME)
+        
+        if autoupdate and len(self.recv_data[topic]) > 0:
+            ok = self._update(topic, configs)
+        return self.last_data[topic] if ok else None
+    
+
+    def set(self, topic, data):
+        if topic not in self.pub_topics:
+            self.pub(topic)
+        self.send(data, topic)
 
     def _update(self, topic, configs=None):
         ## only works for json currently
