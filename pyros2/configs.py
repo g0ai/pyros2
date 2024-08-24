@@ -6,3 +6,5 @@ WAIT = 5
 REFREEZE = 6
 
 NOUPDATE = 7
+
+LAST = 8

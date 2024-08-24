@@ -53,6 +53,10 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # html_theme = 'alabaster'
 html_theme = "sphinxawesome_theme"
 
+from sphinxawesome_theme.postprocess import Icons
+
+html_permalinks = True
+html_permalinks_icon = Icons.permalinks_icon
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

@@ -43,6 +43,7 @@ The following flags are supported:
 - `NEXT`: read the next recieved value, even if much newer values exist (default is reading the latest value)
 - `WAIT`: wait until a message is recieved (default is non-blocking)
 - `NOUPDATE`: get the last returned cached value (default is check for new and get latest)
+- `LAST`: get the last value regardless if new or old (default is None when there is no new value)
 
 ## Licensing
 Initially developed by Ibrahim Abdulhafiz with support from the G0 Lab team.

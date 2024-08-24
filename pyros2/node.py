@@ -7,7 +7,7 @@ _node = Node()
 from pyros2.configs import *
 
 def get(topic, *config):
-    return _node.get(topic, config)
+    return _node.get(topic, *config)
 
 def set(topic, val):
     return _node.set(topic, val)

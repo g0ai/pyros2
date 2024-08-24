@@ -196,6 +196,7 @@ class Node:
         
         if autoupdate and len(self.recv_data[topic]) > 0:
             ok = self._update(topic, configs)
+        ok = True if pyros2.LAST in configs else ok
         return self.last_data[topic] if ok else None
     
 
@@ -270,6 +271,8 @@ class Node:
         
         if autoupdate and len(self.recv_data[topic]) > 0:
             ok = self._update(topic, configs)
+        
+        ok = True if pyros2.LAST in configs else ok
         return self.last_data[topic] if ok else None
     
 
