@@ -185,12 +185,12 @@ class Node:
                 return self.last_data[topic]
 
         else:
-            configs = None
+            configs = () # None
             self.frozen[topic] = False
             # return None
         ok = not autoupdate or len(self.recv_data[topic]) > 0
 
-        if configs is not None and pyros2.WAIT in configs and not ok:
+        if pyros2.WAIT in configs and not ok:
             while len(self.recv_data[topic]) == 0:
                 time.sleep(WAIT_TIME)
         
@@ -260,7 +260,7 @@ class Node:
                 return self.last_data[topic]
 
         else:
-            configs = None
+            configs = () # None
             self.frozen[topic] = False
             # return None
         ok = not autoupdate or len(self.recv_data[topic]) > 0
