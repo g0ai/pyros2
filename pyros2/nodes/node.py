@@ -130,6 +130,11 @@ class Node:
         if pos is None:
             pos = self.position
         return MASTER_PORT + 2*pos
+
+
+    def pub(self, topic):
+        self.pub_topics.append(topic)
+        return True
     
     def sub(self, topic):
         if topic not in self.sub_topics:
@@ -139,10 +144,6 @@ class Node:
             self.last_data_list[topic] = []
         self.sub_sock.subscribe(topic)
         self.sub_sock.setsockopt(zmq.SUBSCRIBE, topic.encode())
-        return True
-    
-    def pub(self, topic):
-        self.pub_topics.append(topic)
         return True
     
     def unsub(self, topic):
@@ -167,92 +168,7 @@ class Node:
         self.pub_sock.close()
         self.ctx.term()
 
-    def __getitem__(self, index):
-        topic = index[0] if isinstance(index, tuple) else index
-        if topic not in self.sub_topics:
-            self.sub(topic)
-        autoupdate = self.autoupdate
-        if isinstance(index, tuple):
-            configs = [index[i] for i in range(1,len(index))]
-            # if pyros2.FREEZE in configs and self.last_data[topic] is not None:
-            #     if self.frozen[topic]:
-            #         return self.last_data[topic]
-            #     else:
-            #         self.frozen[topic] = True
-            # elif pyros2.REFREEZE in configs and self.last_data[topic] is not None:
-            #     pass
-            # else:
-            #     self.frozen[topic] = False
-            # autoupdate = False if pyros2.NOUPDATE in configs else autoupdate
-            if pyros2.NOUPDATE in configs:
-                return self.last_data[topic]
-
-        else:
-            configs = () # None
-            self.frozen[topic] = False
-            # return None
-        ok = not autoupdate or len(self.recv_data[topic]) > 0
-
-        if pyros2.WAIT in configs and not ok:
-            while len(self.recv_data[topic]) == 0:
-                time.sleep(WAIT_TIME)
-        
-        if autoupdate and len(self.recv_data[topic]) > 0:
-            ok = self._update(topic, configs)
-        ok = True if pyros2.LAST in configs else ok
-        return self.last_data[topic] if ok else None
     
-
-    def __setitem__(self, topic, data):
-        if topic not in self.pub_topics:
-            self.pub(topic)
-        self.send(data, topic)
-
-    # def __setitem__(self, topic, data):
-    #     if topic not in self.sub_topics:
-    #         self.sub(topic)
-    #     if topic_code(topic) == "jsn":
-    #         self.last_data[topic].update(data)
-    #     else:
-    #         self.last_data[topic] = data
-
-
-    def start(self):
-        if not self.is_alive:
-            self.is_alive = True
-            self.start_time = time.time()
-            self.thread = threading.Thread(target=self._loop, daemon=True)
-            self.thread.start()
-        else:
-            print(f"Node already running ...")
-
-    def stop(self, force=False):
-        if self.is_alive:
-            self.is_alive = False
-            self.start_time = None
-            if force:
-                pass
-        else:
-            print("Node already stopped")
-
-    def alive(self, wait=0):
-        if self.is_alive:
-            if wait > 0:
-                time.sleep(wait * 1e-3)
-            return self.is_alive
-        else:
-            return False
-    
-    # def get(self, name=None, default=None):
-    #     new_data = self.recv()
-    #     if len(new_data) > 0:
-    #         self.states.update(new_data[-1])
-    #     if name is None:
-    #         return self.states
-    #     elif name in self.states:
-    #         return self.states[name]
-    #     return default
-
     def get(self, topic, *configs):
         if topic not in self.sub_topics:
             self.sub(topic)
@@ -285,12 +201,41 @@ class Node:
             return self.last_data_list[topic]
 
         return self.last_data[topic] if update_success or pyros2.LAST in configs else None
+
+
+    def __getitem__(self, index):
+        topic = index[0] if isinstance(index, tuple) else index
+        configs = (index[i] for i in range(1,len(index))) if isinstance(index, tuple) else ()
+        return self.get(topic, *configs)
     
 
     def set(self, topic, data):
         if topic not in self.pub_topics:
             self.pub(topic)
         self.send(data, topic)
+
+    def __setitem__(self, topic, data):
+        self.set(topic, data)
+
+    def start(self):
+        if not self.is_alive:
+            self.is_alive = True
+            self.start_time = time.time()
+            self.thread = threading.Thread(target=self._loop, daemon=True)
+            self.thread.start()
+        else:
+            print(f"Node already running ...")
+
+    def stop(self, force=False):
+        if self.is_alive:
+            self.is_alive = False
+            self.start_time = None
+            if force:
+                pass
+        else:
+            print("Node already stopped")
+
+
 
     def _update(self, topic, configs=None):
         ## only works for json currently
@@ -314,15 +259,6 @@ class Node:
             self._update(topic)
         
 
-    # def set(self, name={}, val=None):
-    #     if isinstance(name, dict):
-    #         self.states.update(name) 
-    #         self.send(self.states)
-    #     elif name in self.states:
-    #         self.states[name] = val
-    #         self.send(self.states)
-    #     return None
-
     def send(self, inp_dat, topic="main", info=None):
         self.send_counter += 1
         send_info = info if info is not None else self._make_info()
@@ -336,7 +272,6 @@ class Node:
             log_dat = (topic, send_info, inp_dat)
             # pickle.dump(log_dat, self.logger, protocol=pickle.HIGHEST_PROTOCOL)
             self.logger[str(self.send_counter)] = pickle.dumps(log_dat, protocol=pickle.HIGHEST_PROTOCOL)
-            
         return True
 
     def recv(self, topic="main", last=False, n=None):
@@ -349,11 +284,6 @@ class Node:
             self.recv_data[topic] = self.recv_data[topic][n:]
         return [self._topic_parser(topic)(dat[1]) for dat in dats]
         # return [self._topic_parser(topic)(dats[-1][1])] if len(dats) > 0 else []
-    
-    def recv_n(self, topic="main", n=1):
-        dat = self.recv_data[topic][:n]
-        self.recv_data[topic].clear()
-        return [self._topic_parser(topic)(dat[1])]
 
     def _make_info(self):
         info = {}
@@ -450,106 +380,4 @@ class Node:
 
 
 if __name__=="__main__":
-    import sys
-
-    counter = 0
-
-    # trigger = Listener(on_press=on_press)
-    # trigger.start()
-
-    if sys.argv[1] == "1":
-        node = Node()
-        # node["carstate-jsn"] = {"test":10}
-        # node["numbers-str"] = "hello world"
-        # node["lidar-pyo"] = None
-
-        while node.alive(wait=100):
-            # node.update()
-            # print(b.get(last=True), end="\r")
-            # node.send(counter)
-            # print(node["carstate-jsn"])
-            # print(node["numbers-str"])
-            joy_data = node["joystick", pyros2.ONCE, pyros2.NEXT]
-            if joy_data is not None:
-                print(joy_data)
-            
-
-            gps_state = node["gps_state"]
-            if gps_state is not None:
-                print(gps_state)
-
-            
-            nums = node["numbers", pyros2.ONCE]
-            if nums is not None:
-                print("________________")
-                print(nums)
-                print("again > ", node["numbers", pyros2.NOUPDATE])
-                print("again > ", node["numbers", pyros2.NOUPDATE])
-                print("last > ", node["numbers", pyros2.NOUPDATE])
-            # print(node["lidar-pyo"])
-            # print(b.get("letters-str"))
-            counter += 1
-
-        print("node.py | server closing ...")
-
-    elif sys.argv[1] == "2":
-        b = Node()
-
-        while b.alive(wait=50):
-            # b.send_data.append(f"{counter}".encode())
-            # b.send(f"{1000+counter}", "numbers-str")
-            b["numbers"] = 1000+counter
-            # print(b.recv()) # print("Ping pong.")
-            # print(b.get())
-            print(1000+counter)
-            counter += 1
-
-
-        print("node.py | client closing ...")
-    
-    elif sys.argv[1] == "3":
-        b = Node(hz=1000, subscribe=["numbers-str"])
-
-        while b.alive(wait=100):
-            # b.send_data.append(f"{counter}".encode())
-            b.send(f"{5000+counter}", "letters-str")
-            print(b.recv()) # print("Ping pong.")
-            # print(b.get())
-            counter += 1
-
-        print("node.py | client closing ...")
-
-    
-    elif sys.argv[1] == "playback":
-        b = Node(file=pyros2.HOME / "joystick" / "test")
-
-        while b.alive(wait=100):
-            # b.send_data.append(f"{counter}".encode())
-            # b.send(f"{5000+counter}", "letters-str")
-            # print(b.recv()) # print("Ping pong.")
-            # print(b.get())
-            # print(None)
-            counter += 1
-
-        print("node.py | client closing ...")
-    
-
-    
-    elif sys.argv[1] == "ssh":
-        b = Node(ssh_server="ibrahim@192.168.100.125")
-        # b = Node()
-
-        while b.alive(wait=100):
-            # b.send_data.append(f"{counter}".encode())
-            # b.send(f"{5000+counter}", "letters-str")
-            # print(b.recv()) # print("Ping pong.")
-            # print(b.get())
-            # print(None)
-            res = b["numbers"]
-            if res is not None:
-                print(res)
-            # b["numbers"] = counter + 3000
-            # print(counter + 3000)
-            counter += 1
-
-        print("node.py | client closing ...")
+    pass
