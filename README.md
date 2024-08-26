@@ -21,7 +21,7 @@ Here is a simple example to publish a topic from a script:
 from pyros2 import node
 
 new_counter = 500
-node.set("counter", new_counter)
+node.send("counter", new_counter)
 print(f"Sent {new_counter} on topic 'counter'")
 # Sent 500 on topic 'counter'
 
