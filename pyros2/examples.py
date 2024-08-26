@@ -17,7 +17,8 @@ if __name__=="__main__":
 
     if sys.argv[1] == "0":
         while nd.wait(100):
-            nums = nd.get("numbers")
+            # nums = nd.get("numbers")
+            nums = nd.get("drive_path")
             if nums is not None:
                 print(nums)
             

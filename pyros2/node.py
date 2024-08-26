@@ -12,6 +12,9 @@ def get(topic, *config):
 def set(topic, val):
     return _node.set(topic, val)
 
+def send(topic, val):
+    return _node.set(topic, val)
+
 def wait(ms=0):
     return _node.alive(wait=ms)
 

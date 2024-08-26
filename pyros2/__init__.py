@@ -7,5 +7,6 @@ __author__ = "Ibrahim Abdulhafiz"
 
 from pyros2.nodes.node import Node
 from pyros2.threaded import Threaded
+from pyros2.launch import Launcher
 
 from pyros2.configs import *

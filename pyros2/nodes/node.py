@@ -61,6 +61,7 @@ class Node:
         self.send_data = [] # [pickle.dumps("hello")]
 
         self.last_data = {}
+        self.last_data_list = {}
         self.frozen = {}
 
         self.ctx = zmq.Context()
@@ -73,6 +74,7 @@ class Node:
             self.sub_sock.setsockopt(zmq.SUBSCRIBE, topic.encode())
             self.recv_data[topic] = []
             self.last_data[topic] = None # {} if topic_code(topic) == "jsn" else None
+            self.last_data_list[topic] = []
             self.frozen[topic] = False
         
 
@@ -134,6 +136,7 @@ class Node:
             self.sub_topics.append(topic)
             self.recv_data[topic] = []
             self.last_data[topic] = None # {} if topic_code(topic) == "jsn" else None
+            self.last_data_list[topic] = []
         self.sub_sock.subscribe(topic)
         self.sub_sock.setsockopt(zmq.SUBSCRIBE, topic.encode())
         return True
@@ -253,7 +256,7 @@ class Node:
     def get(self, topic, *configs):
         if topic not in self.sub_topics:
             self.sub(topic)
-        autoupdate = self.autoupdate
+        autoupdate = True # self.autoupdate
         is_config = len(configs) > 0
         if is_config:
             if pyros2.NOUPDATE in configs:
@@ -263,17 +266,25 @@ class Node:
             configs = () # None
             self.frozen[topic] = False
             # return None
-        ok = not autoupdate or len(self.recv_data[topic]) > 0
+        update_available = len(self.recv_data[topic]) > 0
 
-        if is_config and pyros2.WAIT in configs and not ok:
+        if is_config and pyros2.WAIT in configs and not update_available:
             while len(self.recv_data[topic]) == 0:
                 time.sleep(WAIT_TIME)
+            update_available = len(self.recv_data[topic]) > 0
+            assert update_available
         
-        if autoupdate and len(self.recv_data[topic]) > 0:
-            ok = self._update(topic, configs)
-        
-        ok = True if pyros2.LAST in configs else ok
-        return self.last_data[topic] if ok else None
+        # if autoupdate and len(self.recv_data[topic]) > 0:
+        update_success = False
+        if update_available:
+            update_success = self._update(topic, configs)
+
+        if pyros2.ALL in configs:
+            if not update_available:
+                self.last_data_list[topic].clear()
+            return self.last_data_list[topic]
+
+        return self.last_data[topic] if update_success or pyros2.LAST in configs else None
     
 
     def set(self, topic, data):
@@ -285,7 +296,8 @@ class Node:
         ## only works for json currently
         n = 1 if configs is not None and pyros2.NEXT in configs else None
         new_data = self.recv(topic, n=n)
-        if len(new_data) == 0 and configs is not None and pyros2.ONCE in configs:
+        self.last_data_list[topic] = new_data
+        if len(new_data) == 0: # and configs is not None and pyros2.ONCE in configs:
             return False
         for data in new_data:
             if topic_code(topic) != "jsn":

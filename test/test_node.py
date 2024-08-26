@@ -3,18 +3,46 @@ import unittest
 import pyros2
 from pyros2 import Node
 from pyros2 import node
+import time
 
 class TestNodeCase(unittest.TestCase):
 
     def test_node(self):
         val = 5
         node1 = Node()
-        node.set("test", val)
+        node.send("test", val)
         resp = node1.get("test", pyros2.WAIT)
         self.assertEqual(val, resp)
 
         # node1.close()
         # node.close()
+    
+
+    def test_wait(self):
+        val1 = 6
+        val2 = 10
+        node1 = Node()
+        node.send("test", 0)
+        node.send("test", val1)
+        node.send("test", val2)
+        
+        tmp = node1.get("test", pyros2.WAIT, pyros2.NEXT)
+        resp1 = node1.get("test", pyros2.NEXT)
+        self.assertEqual(val1, resp1)
+        resp2 = node1.get("test", pyros2.NEXT)
+        self.assertEqual(val2, resp2)
+
+    def test_all(self):
+        val1 = 6
+        val2 = 10
+        node1 = Node()
+        node.send("test", 0)
+        node.send("test", val1)
+        node.send("test", val2)
+        
+        resp = node1.get("test", pyros2.WAIT, pyros2.ALL)
+        self.assertEqual(val1, resp[1])
+        self.assertEqual(val2, resp[2])
 
 if __name__ == '__main__':
     unittest.main()
