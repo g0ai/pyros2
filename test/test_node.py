@@ -18,6 +18,23 @@ class TestNodeCase(unittest.TestCase):
         # node.close()
     
 
+
+    def test_update(self):
+        val = 5
+        node1 = Node()
+        node.send("test", val)
+        tmp = node1.get("test", pyros2.WAIT)
+        node.send("test", 0)
+
+        resp = node1.get("test", pyros2.NOUPDATE)
+
+        self.assertEqual(tmp, resp)
+        self.assertEqual(val, resp)
+
+        # node1.close()
+        # node.close()
+    
+
     def test_wait(self):
         val1 = 6
         val2 = 10
