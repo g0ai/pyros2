@@ -23,7 +23,7 @@ def main():
         if os.path.basename(os.getcwd()) == "launch":
             default_file = "default.py"
             if os.path.isfile(default_file):
-                
+                pass
 
 
 

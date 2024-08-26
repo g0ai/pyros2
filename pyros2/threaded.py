@@ -3,7 +3,7 @@ import time
 
 from pynput.keyboard import Key, Listener
 
-from pyros2.rate import Rate
+from pyros2.extra.rate import Rate
 
 """
 # template structure

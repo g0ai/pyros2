@@ -1,4 +1,4 @@
-ONCE = -1 # deprecated
+# ONCE = -1 # deprecated
 NEXT = 3
 
 FREEZE = 4

@@ -5,7 +5,7 @@ HOME = pathlib_Path.home() / "pyros2"
 __version__ = "0.1.0"
 __author__ = "Ibrahim Abdulhafiz"
 
-from pyros2.nodes.node import Node
+from pyros2.nodes.zmq_node import Node
 from pyros2.threaded import Threaded
 from pyros2.launch import Launcher
 
