@@ -9,6 +9,21 @@ from pyros2.configs import *
 def get(topic, *config):
     return _node.get(topic, *config)
 
+def get_block(topic, *config):
+    return _node.get(topic, *(WAIT, *config))
+
+def get_last(topic, *config):
+    return _node.get(topic, *(LAST, *config))
+
+def get_next(topic, *config):
+    return _node.get(topic, *(NEXT, *config))
+
+def get_all(topic, *config):
+    return _node.get(topic, *(ALL, *config))
+
+def get_cached(topic, *config):
+    return _node.get(topic, *(NOUPDATE, *config))
+
 def set(topic, val):
     return _node.set(topic, val)
 
@@ -24,7 +39,7 @@ def close():
 
 
 def ok():
-    return _node.alive(wait=0)
+    return _node.info()
 
 
 def record(fname="test"):

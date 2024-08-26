@@ -8,11 +8,15 @@ import time
 class TestNodeCase(unittest.TestCase):
 
     def test_node(self):
+        print("Testing")
         val = 5
         node1 = Node()
         node.send("test", val)
         resp = node1.get("test", pyros2.WAIT)
         self.assertEqual(val, resp)
+
+
+        print("Done general Testing")
 
         # node1.close()
         # node.close()
@@ -20,6 +24,7 @@ class TestNodeCase(unittest.TestCase):
 
 
     def test_update(self):
+        print("Testing Update")
         val = 5
         node1 = Node()
         node.send("test", val)
@@ -31,11 +36,14 @@ class TestNodeCase(unittest.TestCase):
         self.assertEqual(tmp, resp)
         self.assertEqual(val, resp)
 
+        print("Done testing Update")
+
         # node1.close()
         # node.close()
     
 
     def test_wait(self):
+        print("Testing Wait")
         val1 = 6
         val2 = 10
         node1 = Node()
@@ -49,7 +57,10 @@ class TestNodeCase(unittest.TestCase):
         resp2 = node1.get("test", pyros2.NEXT)
         self.assertEqual(val2, resp2)
 
+        print("Done testing Wait")
+
     def test_all(self):
+        print("Testing All")
         val1 = 6
         val2 = 10
         node1 = Node()
@@ -60,6 +71,8 @@ class TestNodeCase(unittest.TestCase):
         resp = node1.get("test", pyros2.WAIT, pyros2.ALL)
         self.assertEqual(val1, resp[1])
         self.assertEqual(val2, resp[2])
+
+        print("Done Testing All")
 
 if __name__ == '__main__':
     unittest.main()
