@@ -153,6 +153,10 @@ class Node:
             self.ips.append(ip)
             self._connect_sub(ip)
 
+            msg = {"new_ip":ip}
+            self.pub_sock.send_multipart([b"ros0", self._make_info().encode(), json.dumps(msg).encode()])
+
+
 
     def pub(self, topic):
         self.pub_topics.append(topic)
@@ -357,6 +361,10 @@ class Node:
                                         self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, self.ssh_server, password = self.ssh_pass))
                                     if self.position != msg['new_node']:
                                         print(f"New node found at {msg['new_node']}!")
+                            
+                            if "new_ip" in msg:
+                                self.set_ip(msg["new_ip"])
+                            
                         elif topic in self.sub_topics:
                             self.recv_data[topic].append((recv_time_ns, dat))
                         # dat_dict = pickle.loads(dat)
