@@ -33,6 +33,16 @@ def send(topic, val):
 def wait(ms=0):
     return _node.alive(wait=ms)
 
+def save_as(file):
+    return _node._saving(tag=file)
+
+def stop_save():
+    return _node._saving()
+
+
+def set_ip(ip="localhost"):
+    return _node.set_ip(ip)
+
 
 def close():
     return _node.close()

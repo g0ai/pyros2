@@ -20,6 +20,8 @@ Here is a simple example to publish a topic from a script:
 # pub.py
 from pyros2 import node
 
+node.save_as("test")
+
 new_counter = 500
 node.send("counter", new_counter)
 print(f"Sent {new_counter} on topic 'counter'")
@@ -33,6 +35,12 @@ from pyros2 import node
 counter = node.get("counter", node.WAIT)
 print(f"Recieved {counter} on topic 'counter'")
 # Recieved 500 on topic 'counter'
+```
+
+If you want to replay what `pub.py` published, simply run the following in the command line:
+```bash
+# pyros2 [-r/--replay] <python file name> <save_as tag>
+pyros2 --replay pub test
 ```
 
 ### Flags

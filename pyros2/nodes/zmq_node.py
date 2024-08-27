@@ -2,7 +2,7 @@ import threading
 import zmq
 import time
 import pickle
-import dbm
+import dbm.dumb as dbm
 import json
 
 import inspect
@@ -98,14 +98,8 @@ class Node:
                 # self.sub_sock.connect(f"tcp://{self.ip}:{self.node_port}")
         print(f"My node_port: {self._node_port()}")
 
-        # self.sub_sock.connect(f"tcp://{self.ip}:{self.port}")
-        for i in range(MAX_NODES): # self.position):
-            for ip in self.ips:
-                conn = f"tcp://{ip}:{self._node_port(i)}"
-                if self.ssh_server is None:
-                    self.sub_sock.connect(conn)
-                else:
-                    self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = self.ssh_pass))
+        for ip in self.ips:
+            self._connect_sub(ip)
         
 
         time.sleep(SLOWDOWN) # switch later to ack to make sure everything is ok
@@ -114,22 +108,49 @@ class Node:
 
         # logging
         if self.saving:
-            # folder_name = Path(__file__).name.split(".")[0]
-            folder_name = os.path.basename(inspect.stack()[-1].filename).split(".")[0]
-            # log_name = time.strftime("%Y%m%d-%H%M%S") # + ".log"
-            log_name = "test"
-            output_file = pyros2.HOME / folder_name / log_name
-            output_file.parent.mkdir(exist_ok=True, parents=True)
-            # self.logger = open(output_file, "wb")
-            self.logger = dbm.open(str(output_file), "c")
+            self._saving()
 
         if start:
             self.start()
+    
+
+    def _saving(self, tag="temp"):
+        if self.saving:
+            self.logger["N"] = str(self.send_counter)
+            self.logger.close()
+
+        # logging
+        # folder_name = Path(__file__).name.split(".")[0]
+        folder_name = os.path.basename(inspect.stack()[-1].filename).split(".")[0]
+        log_name = time.strftime("%Y%m%d-%H%M%S") + f"_{tag}" # + ".log"
+        # log_name = "test"
+        output_file = pyros2.HOME / folder_name / log_name
+        output_file.parent.mkdir(exist_ok=True, parents=True)
+        # self.logger = open(output_file, "wb")
+        self.logger = dbm.open(str(output_file), "n") # c for create but not overwrite
+        self.logger["N"] = str(-1)
+        self.logger["start_time"] = str(time.time())
+
+        self.saving = True
+
+    def _connect_sub(self, ip):
+        # self.sub_sock.connect(f"tcp://{self.ip}:{self.port}")
+        for i in range(MAX_NODES): # self.position):
+            conn = f"tcp://{ip}:{self._node_port(i)}"
+            if self.ssh_server is None:
+                self.sub_sock.connect(conn)
+            else:
+                self.tunnels.append(ssh.tunnel_connection(self.sub_sock, conn, ssh_server, password = self.ssh_pass))
 
     def _node_port(self, pos=None):
         if pos is None:
             pos = self.position
         return MASTER_PORT + 2*pos
+
+    def set_ip(self, ip=MASTER_IP):
+        if ip not in self.ips:
+            self.ips.append(ip)
+            self._connect_sub(ip)
 
 
     def pub(self, topic):
@@ -270,8 +291,10 @@ class Node:
         # log_dat = {"topic": topic, "info": send_info, "data": dat}
         if self.saving:
             log_dat = (topic, send_info, inp_dat)
+            # print(self.send_counter, "      ", json.loads(send_info)["time"])
             # pickle.dump(log_dat, self.logger, protocol=pickle.HIGHEST_PROTOCOL)
             self.logger[str(self.send_counter)] = pickle.dumps(log_dat, protocol=pickle.HIGHEST_PROTOCOL)
+            self.logger["N"] = str(self.send_counter)
         return True
 
     def recv(self, topic="main", last=False, n=None):
