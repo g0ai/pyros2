@@ -65,6 +65,7 @@ class Node:
         self.frozen = {}
 
         self.ctx = zmq.Context()
+        self.ctx.setsockopt(zmq.IPV6,1)
 
         self.sub_sock = self.ctx.socket(zmq.SUB)
         self.sub_topics = ["ros0", "main"] + subscribe

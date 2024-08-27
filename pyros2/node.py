@@ -1,6 +1,6 @@
 
 
-from pyros2 import Node
+from pyros2.nodes.zmq_node import Node
 
 _node = Node()
 

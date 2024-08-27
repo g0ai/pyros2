@@ -14,6 +14,7 @@ def get_conda_python_path(conda_env_name):
 class Launcher():
     def __init__(self, root=".", env=None, env_name=None):
         self._root = root
+        self.ips = ['localhost']
         self._processes = []
         if env is None:
             self._python = "python"
@@ -23,6 +24,9 @@ class Launcher():
 
     def add(self, file):
         self._processes.append(subprocess.Popen([self._python, file], cwd=self._root))
+    
+    def add_ip(self, ip):
+        self.ips.append(ip)
 
     def run(self, cmd):
         self._processes.append(subprocess.Popen(cmd, cwd=self._root))

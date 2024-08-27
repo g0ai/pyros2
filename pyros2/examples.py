@@ -2,7 +2,7 @@
 
 import pyros2
 import time
-from pyros2 import Node
+from pyros2.nodes.zmq_node import Node
 from pyros2 import node as nd
 
 
@@ -102,7 +102,27 @@ if __name__=="__main__":
 
         print("node.py | client closing ...")
     
+    elif sys.argv[1] == "vpn":
+        # b = Node()
+        # b = Node()
+        nd.set_ip("fc94:2730:59c1:87b4:4ce0:6016:ab5:8a17")
 
+        while True:
+            # b.send_data.append(f"{counter}".encode())
+            # b.send(f"{5000+counter}", "letters-str")
+            # print(b.recv()) # print("Ping pong.")
+            # print(b.get())
+            # print(None)
+            res = nd.get_block("joystick")
+            print(res)
+            # res = b["numbers"]
+            # if res is not None:
+            #     print(res)
+            # b["numbers"] = counter + 3000
+            # print(counter + 3000)
+            counter += 1
+
+        print("node.py | client closing ...")
     
     elif sys.argv[1] == "ssh":
         b = Node(ssh_server="ibrahim@192.168.100.125")
